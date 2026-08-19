@@ -1,0 +1,93 @@
+import { useState } from "react";
+import { T, FUENTE } from "./estilos.jsx";
+import { useSesion, Auth, Pendiente, Equipo, Actividad, ROL_LABEL } from "./Acceso.jsx";
+
+/* ============================================================
+   EJEMPLO DE USO
+   Este archivo muestra como enganchar el sistema de accesos.
+   Reemplaza el contenido de las solapas por lo tuyo.
+   ============================================================ */
+
+const TITULO = "SISTEMA";
+
+export default function App() {
+  const { sesion, perfil, cargando, salir } = useSesion();
+  const [solapa, setSolapa] = useState("inicio");
+
+  // Cargando
+  if (sesion === undefined || (sesion && cargando && !perfil)) {
+    return (
+      <div style={{ minHeight: "100vh", background: T.negro, color: T.ink, display: "flex",
+        alignItems: "center", justifyContent: "center", fontFamily: FUENTE, fontWeight: 800,
+        fontSize: 28, letterSpacing: ".1em" }}>{TITULO}</div>
+    );
+  }
+
+  // Sin sesion: login o registro
+  if (!sesion) return <Auth titulo={TITULO} subtitulo="Acceso al sistema" />;
+
+  // Con sesion pero sin aprobar: pantalla de espera
+  if (!perfil || perfil.estado !== "activo") {
+    return <Pendiente perfil={perfil} onSalir={salir} titulo={TITULO} />;
+  }
+
+  const esDireccion = perfil.rol === "director";
+  const puedeEquipo = esDireccion || perfil.rol === "gerente";
+
+  const SOLAPAS = [
+    ["inicio", "Inicio"],
+    ...(puedeEquipo ? [["equipo", "Equipo"], ["actividad", "Actividad"]] : []),
+  ];
+
+  return (
+    <div style={{ minHeight: "100vh", background: T.fondo, fontFamily: FUENTE, color: T.ink }}>
+      <header style={{ background: T.negro, borderBottom: "1px solid " + T.line, padding: "15px 24px" }}>
+        <div style={{ maxWidth: 1000, margin: "0 auto", display: "flex", alignItems: "center",
+          justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
+          <div style={{ fontWeight: 800, fontSize: 24, letterSpacing: ".1em" }}>{TITULO}</div>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <div style={{ textAlign: "right", lineHeight: 1.35 }}>
+              <div style={{ fontSize: 13, fontWeight: 700 }}>{perfil.nombre}</div>
+              <div style={{ fontSize: 11.5, color: T.inkSoft }}>
+                {ROL_LABEL[perfil.rol]}{esDireccion ? " - Todas las sedes" : " - " + perfil.sede}
+              </div>
+            </div>
+            <button onClick={salir} style={{ border: "1px solid " + T.line, background: "transparent",
+              color: T.inkSoft, fontWeight: 600, fontSize: 12, padding: "8px 15px", borderRadius: 999,
+              cursor: "pointer", fontFamily: FUENTE }}>Salir</button>
+          </div>
+        </div>
+      </header>
+
+      <div style={{ background: T.negro, borderBottom: "1px solid " + T.line }}>
+        <div style={{ maxWidth: 1000, margin: "0 auto", padding: "0 16px", display: "flex", gap: 2, overflowX: "auto" }}>
+          {SOLAPAS.map((x) => {
+            const on = solapa === x[0];
+            return (
+              <button key={x[0]} onClick={() => setSolapa(x[0])}
+                style={{ border: "none", background: "none",
+                  borderBottom: "2px solid " + (on ? T.marca : "transparent"),
+                  color: on ? T.ink : T.inkSoft, fontWeight: 700, fontSize: 13.5,
+                  padding: "15px", cursor: "pointer", whiteSpace: "nowrap", fontFamily: FUENTE }}>{x[1]}</button>
+            );
+          })}
+        </div>
+      </div>
+
+      <main style={{ maxWidth: 1000, margin: "0 auto", padding: "20px 16px 60px" }}>
+        {solapa === "inicio" && (
+          <div style={{ background: T.surface, border: "1px solid " + T.line, borderRadius: 16, padding: 24 }}>
+            <div style={{ fontSize: 20, fontWeight: 800, textTransform: "uppercase" }}>Aca va tu app</div>
+            <div style={{ fontSize: 13.5, color: T.inkSoft, marginTop: 8, lineHeight: 1.6 }}>
+              Reemplaza este bloque por tus pantallas. Ya tenes disponible el objeto
+              <b style={{ color: T.ink }}> perfil</b> con id, nombre, rol y sede del usuario
+              que esta usando el sistema.
+            </div>
+          </div>
+        )}
+        {solapa === "equipo" && puedeEquipo && <Equipo perfil={perfil} />}
+        {solapa === "actividad" && puedeEquipo && <Actividad />}
+      </main>
+    </div>
+  );
+}
