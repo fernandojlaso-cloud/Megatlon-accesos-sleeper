@@ -2,6 +2,7 @@ import { useState } from "react";
 import { T, FUENTE } from "./estilos.jsx";
 import { useSesion, Auth, Pendiente, Equipo, Actividad, ROL_LABEL } from "./Acceso.jsx";
 import Sleepers from "./sleepers/Sleepers.jsx";
+import Administrador from "./sleepers/Administrador.jsx";
 
 /* ============================================================
    EJEMPLO DE USO
@@ -13,7 +14,7 @@ const TITULO = "SISTEMA";
 
 export default function App() {
   const { sesion, perfil, cargando, salir } = useSesion();
-  const [solapa, setSolapa] = useState("inicio");
+  const [solapa, setSolapa] = useState("sleepers");
 
   // Cargando
   if (sesion === undefined || (sesion && cargando && !perfil)) {
@@ -36,15 +37,15 @@ export default function App() {
   const puedeEquipo = esDireccion || perfil.rol === "gerente";
 
   const SOLAPAS = [
-    ["inicio", "Inicio"],
     ["sleepers", "Sleepers"],
+    ...(esDireccion ? [["administrador", "Administrador"]] : []),
     ...(puedeEquipo ? [["equipo", "Equipo"], ["actividad", "Actividad"]] : []),
   ];
 
   return (
     <div style={{ minHeight: "100vh", background: T.fondo, fontFamily: FUENTE, color: T.ink }}>
       <header style={{ background: T.negro, borderBottom: "1px solid " + T.line, padding: "15px 24px" }}>
-        <div style={{ maxWidth: solapa === "sleepers" ? 1900 : 1000, margin: "0 auto", display: "flex", alignItems: "center",
+        <div style={{ maxWidth: ["sleepers","administrador"].includes(solapa) ? 1900 : 1000, margin: "0 auto", display: "flex", alignItems: "center",
           justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
           <div style={{ fontWeight: 800, fontSize: 24, letterSpacing: ".1em" }}>{TITULO}</div>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
@@ -62,7 +63,7 @@ export default function App() {
       </header>
 
       <div style={{ background: T.negro, borderBottom: "1px solid " + T.line }}>
-        <div style={{ maxWidth: solapa === "sleepers" ? 1900 : 1000, margin: "0 auto", padding: "0 16px", display: "flex", gap: 2, overflowX: "auto" }}>
+        <div style={{ maxWidth: ["sleepers","administrador"].includes(solapa) ? 1900 : 1000, margin: "0 auto", padding: "0 16px", display: "flex", gap: 2, overflowX: "auto" }}>
           {SOLAPAS.map((x) => {
             const on = solapa === x[0];
             return (
@@ -76,17 +77,9 @@ export default function App() {
         </div>
       </div>
 
-      <main style={{ maxWidth: solapa === "sleepers" ? 1900 : 1000, margin: "0 auto", padding: "20px 16px 60px" }}>
-        {solapa === "inicio" && (
-          <div style={{ background: T.surface, border: "1px solid " + T.line, borderRadius: 16, padding: 24 }}>
-            <div style={{ fontSize: 20, fontWeight: 800, textTransform: "uppercase" }}>Bienvenido, {perfil.nombre}</div>
-            <div style={{ fontSize: 13.5, color: T.inkSoft, marginTop: 8, lineHeight: 1.6 }}>
-              Usá la solapa <b style={{ color: T.ink }}>Sleepers</b> para cargar y hacer seguimiento
-              de los socios que dejaron de asistir.
-            </div>
-          </div>
-        )}
+      <main style={{ maxWidth: ["sleepers","administrador"].includes(solapa) ? 1900 : 1000, margin: "0 auto", padding: "20px 16px 60px" }}>
         {solapa === "sleepers" && <Sleepers perfil={perfil} />}
+        {solapa === "administrador" && esDireccion && <Administrador />}
         {solapa === "equipo" && puedeEquipo && <Equipo perfil={perfil} />}
         {solapa === "actividad" && puedeEquipo && <Actividad />}
       </main>

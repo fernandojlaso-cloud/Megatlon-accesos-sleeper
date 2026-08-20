@@ -1,14 +1,24 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as XLSX from "xlsx";
 import { T, FUENTE, inp, lab, btnMarca, btnOut, btnVerde, Badge } from "../estilos.jsx";
-import { useCasos, useSociosTotales, crearCasos, actualizarCaso, eliminarCasos, reasignarSede, agregarComentario } from "./datos.js";
+import { useCasos, useSociosTotales, crearCasos, actualizarCaso, agregarComentario } from "./datos.js";
 import {
-  IconoSubir, IconoBajar, IconoBasura, IconoCandado, IconoPin, IconoMas,
+  IconoSubir, IconoBajar, IconoMas,
   IconoChat, IconoMail, IconoAlerta, IconoReloj, IconoCheckCirculo, IconoX, IconoTrofeo,
   IconoCarpeta, IconoFlechaAbajo,
 } from "./iconos.jsx";
 
-const MOTIVOS = ["Falta de tiempo", "Lesión o problema de salud", "Problemas personales", "Mudanza", "Problemas con el servicio", "Otro"];
+const MOTIVOS = ["Falta de tiempo", "Problemas personales", "Mudanza", "Lesión o problema de salud", "Problemas con el servicio", "Vacaciones", "Otro"];
+
+const RIESGO_POR_MOTIVO = {
+  "Falta de tiempo": "Alto",
+  "Problemas personales": "Alto",
+  "Mudanza": "Alto",
+  "Lesión o problema de salud": "Medio",
+  "Problemas con el servicio": "Medio",
+  "Vacaciones": "Bajo",
+  "Otro": "Bajo",
+};
 
 const hoyStr = () => new Date().toISOString().slice(0, 10);
 const fmt = (iso) => { if (!iso) return "—"; const [y, m, d] = iso.split("-"); return `${d}/${m}/${y}`; };
@@ -72,6 +82,14 @@ function alarmaDe(c) {
   return { color: T.red, bg: T.redSoft, label: `Día ${dias}` };
 }
 
+// Contrato por vencer o ya vencido: 90 dias o menos hasta la fecha de fin.
+// Distinto del rojo de la alarma (que es por falta de respuesta) — este marca
+// la fila entera con un marco, no una etiqueta.
+function contratoPorVencer(c) {
+  if (!c.fecha_fin_contrato) return false;
+  return diasEntre(hoyStr(), c.fecha_fin_contrato) <= 90;
+}
+
 /* ---------- lectura de planillas ---------- */
 
 function splitCSVLine(line) {
@@ -96,19 +114,35 @@ function parseCSV(text) {
     return obj;
   });
 }
+function normalizarFecha(valor) {
+  if (!valor) return "";
+  if (valor instanceof Date && !isNaN(valor)) return valor.toISOString().slice(0, 10);
+  const str = valor.toString().trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
+  const m = str.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})$/);
+  if (m) {
+    let [, d, mo, y] = m;
+    if (y.length === 2) y = "20" + y;
+    return `${y}-${mo.padStart(2, "0")}-${d.padStart(2, "0")}`;
+  }
+  return "";
+}
+
 function mapRow(row, defaults) {
   const keys = Object.keys(row);
   const find = (...names) => {
-    for (const k of keys) { if (names.includes(norm(k))) return (row[k] || "").toString().trim(); }
+    for (const k of keys) { if (names.includes(norm(k))) return row[k]; }
     return "";
   };
+  const findTxt = (...names) => (find(...names) || "").toString().trim();
   return {
-    nombre: find("nombre", "socio", "cliente", "nombre y apellido"),
-    dni: find("dni", "documento", "nro documento", "numero de documento", "cedula"),
-    email: find("email", "correo", "mail", "e-mail"),
-    telefono: find("telefono", "celular", "whatsapp", "tel", "numero", "número"),
-    sede: find("sede", "sucursal") || defaults.sede,
-    ultimaVisita: find("ultima visita", "fecha ultima visita", "ultimo ingreso"),
+    nombre: findTxt("nombre", "socio", "cliente", "nombre y apellido"),
+    dni: findTxt("dni", "documento", "nro documento", "numero de documento", "cedula"),
+    email: findTxt("email", "correo", "mail", "e-mail"),
+    telefono: findTxt("telefono", "celular", "whatsapp", "tel", "numero", "número"),
+    sede: findTxt("sede", "sucursal") || defaults.sede,
+    ultimaVisita: findTxt("ultima visita", "fecha ultima visita", "ultimo ingreso"),
+    fechaFinContrato: normalizarFecha(find("fin de su contrato", "fin de contrato", "fin contrato", "vencimiento", "vencimiento plan", "fecha vencimiento", "fecha fin contrato")),
   };
 }
 
@@ -125,9 +159,7 @@ export default function Sleepers({ perfil }) {
   );
 
   const esDireccion = perfil.rol === "director";
-  const esGerente = perfil.rol === "gerente";
   const puedeCargar = ["director", "gerente", "vendedor"].includes(perfil.rol);
-  const puedeAdmin = esDireccion || esGerente;
   const cargoLabel = { director: "Director", gerente: "Gerente", vendedor: "Vendedor", profesor: "Profesor", control_acceso: "Control de acceso" }[perfil.rol] || "Gerente";
 
   const [boAbierto, setBoAbierto] = useState(false);
@@ -142,8 +174,6 @@ export default function Sleepers({ perfil }) {
   const [filtroSede, setFiltroSede] = useState("");
   const [filtroEstado, setFiltroEstado] = useState("Abierto");
   const [busqueda, setBusqueda] = useState("");
-  const [adminAbierto, setAdminAbierto] = useState(false);
-  const [seleccionados, setSeleccionados] = useState(new Set());
   const [modalMensaje, setModalMensaje] = useState(null);
   const [modalComentarios, setModalComentarios] = useState(null);
   const [nuevoComentario, setNuevoComentario] = useState("");
@@ -189,7 +219,7 @@ export default function Sleepers({ perfil }) {
         filas = parseCSV(text);
       } else {
         const buf = await file.arrayBuffer();
-        const wb = XLSX.read(buf, { type: "array" });
+        const wb = XLSX.read(buf, { type: "array", cellDates: true });
         const sheet = wb.Sheets[wb.SheetNames[0]];
         filas = XLSX.utils.sheet_to_json(sheet, { defval: "" });
       }
@@ -212,6 +242,7 @@ export default function Sleepers({ perfil }) {
       telefono: (r.telefono || "").toString().replace(/[^\d]/g, "") || null,
       sede: r.sede || perfil.sede || "Sin sede",
       ultima_visita: r.ultimaVisita || null,
+      fecha_fin_contrato: r.fechaFinContrato || null,
       mensaje: construirMensaje(r.nombre, perfil.nombre, r.sede || perfil.sede, cargoLabel),
       subido_por: perfil.nombre,
       cargo_subido_por: cargoLabel,
@@ -227,7 +258,7 @@ export default function Sleepers({ perfil }) {
     }
   }
 
-  const [manual, setManual] = useState({ nombre: "", dni: "", email: "", telefono: "", sede: "", ultimaVisita: "" });
+  const [manual, setManual] = useState({ nombre: "", dni: "", email: "", telefono: "", sede: "", ultimaVisita: "", finContrato: "" });
   async function agregarManual() {
     if (!manual.nombre.trim()) { alert("El nombre es obligatorio."); return; }
     const sede = manual.sede.trim() || perfil.sede || "Sin sede";
@@ -239,6 +270,7 @@ export default function Sleepers({ perfil }) {
         telefono: manual.telefono.trim().replace(/[^\d]/g, "") || null,
         sede,
         ultima_visita: manual.ultimaVisita.trim() || null,
+        fecha_fin_contrato: manual.finContrato || null,
         mensaje: construirMensaje(manual.nombre.trim(), perfil.nombre, sede, cargoLabel),
         subido_por: perfil.nombre,
         cargo_subido_por: cargoLabel,
@@ -246,14 +278,14 @@ export default function Sleepers({ perfil }) {
         fecha_carga: hoyStr(),
         estado: "Abierto",
       }]);
-      setManual({ nombre: "", dni: "", email: "", telefono: "", sede: "", ultimaVisita: "" });
+      setManual({ nombre: "", dni: "", email: "", telefono: "", sede: "", ultimaVisita: "", finContrato: "" });
     } catch (err) {
       alert("No se pudo agregar: " + err.message);
     }
   }
 
   function descargarPlantilla() {
-    const csv = "Nombre,DNI,Email,Telefono,Sede,Ultima Visita\nJuan Pérez,30123456,juan.perez@mail.com,5491122334455,Núñez,15/03/2026\n";
+    const csv = "Nombre,DNI,Email,Telefono,Sede,Ultima Visita,Fin de su contrato\nJuan Pérez,30123456,juan.perez@mail.com,5491122334455,Núñez,15/03/2026,20/09/2026\n";
     const blob = new Blob([csv], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a"); a.href = url; a.download = "plantilla_socios_megatlon.csv"; a.click();
@@ -277,10 +309,6 @@ export default function Sleepers({ perfil }) {
   }
   async function marcarEnvio(c) {
     if (!c.fecha_envio_mensaje) await cambiarCampo(c.id, { fecha_envio_mensaje: hoyStr() });
-  }
-  async function borrarCaso(id) {
-    if (!confirm("¿Eliminar este socio de la planilla?")) return;
-    try { await eliminarCasos([id]); } catch (err) { alert("No se pudo eliminar: " + err.message); }
   }
   function abrirComentarios(c) {
     setModalComentarios(c);
@@ -349,11 +377,6 @@ export default function Sleepers({ perfil }) {
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", flexWrap: "wrap", gap: 12, marginBottom: 18 }}>
         <div style={{ fontSize: 13, textTransform: "uppercase", fontWeight: 800, letterSpacing: "-.01em", color: T.inkSoft }}>Seguimiento de sleepers</div>
-        {puedeAdmin && (
-          <button style={s.ghostBtn} onClick={() => setAdminAbierto((v) => !v)}>
-            <IconoCandado /> Panel de administración
-          </button>
-        )}
       </div>
 
       {puedeCargar && (
@@ -377,7 +400,7 @@ export default function Sleepers({ perfil }) {
                 <button style={s.ghostBtn} onClick={exportarCSV}><IconoBajar /> Exportar datos actuales (CSV)</button>
               </div>
               <p style={{ fontSize: 11.5, color: T.inkSoft, margin: "0 0 16px" }}>
-                Columnas esperadas: <b style={{ color: T.ink }}>Nombre</b>, <b style={{ color: T.ink }}>DNI</b> (opcional), <b style={{ color: T.ink }}>Email</b>, <b style={{ color: T.ink }}>Teléfono</b>, <b style={{ color: T.ink }}>Sede</b>, <b style={{ color: T.ink }}>Última Visita</b> (opcional).
+                Columnas esperadas: <b style={{ color: T.ink }}>Nombre</b>, <b style={{ color: T.ink }}>DNI</b> (opcional), <b style={{ color: T.ink }}>Email</b>, <b style={{ color: T.ink }}>Teléfono</b>, <b style={{ color: T.ink }}>Sede</b>, <b style={{ color: T.ink }}>Última Visita</b> (opcional), <b style={{ color: T.ink }}>Fin de su contrato</b> (opcional — si vence en 90 días o menos, la fila se marca en rojo).
                 {!esDireccion && " Como no sos Dirección, se cargan automáticamente en tu sede."}
               </p>
 
@@ -386,14 +409,14 @@ export default function Sleepers({ perfil }) {
                   <p style={{ fontSize: 12, fontWeight: 700, marginBottom: 8 }}>Vista previa ({pendientes.length} filas)</p>
                   <div style={{ maxHeight: 220, overflow: "auto", border: "1px solid " + T.line, borderRadius: 11 }}>
                     <table style={{ width: "100%", fontSize: 12, borderCollapse: "collapse" }}>
-                      <thead><tr>{["Nombre", "DNI", "Email", "Teléfono", "Sede"].map((h) => (
+                      <thead><tr>{["Nombre", "DNI", "Email", "Teléfono", "Sede", "Fin contrato"].map((h) => (
                         <th key={h} style={{ textAlign: "left", padding: 8, color: T.inkSoft, borderBottom: "1px solid " + T.line }}>{h}</th>
                       ))}</tr></thead>
                       <tbody>{pendientes.map((r, i) => (
                         <tr key={i}>
                           <td style={s.td}>{r.nombre}</td><td style={s.td}>{r.dni || "—"}</td>
                           <td style={s.td}>{r.email || "—"}</td><td style={s.td}>{r.telefono || "—"}</td>
-                          <td style={s.td}>{r.sede || "—"}</td>
+                          <td style={s.td}>{r.sede || "—"}</td><td style={s.td}>{fmt(r.fechaFinContrato) || "—"}</td>
                         </tr>
                       ))}</tbody>
                     </table>
@@ -415,6 +438,7 @@ export default function Sleepers({ perfil }) {
                 <div style={{ flex: 1, minWidth: 140 }}><label style={lab}>Teléfono</label><input style={inp} value={manual.telefono} onChange={(e) => setManual({ ...manual, telefono: e.target.value })} /></div>
                 {esDireccion && <div style={{ flex: 1, minWidth: 120 }}><label style={lab}>Sede</label><input style={inp} value={manual.sede} onChange={(e) => setManual({ ...manual, sede: e.target.value })} placeholder={perfil.sede || ""} /></div>}
                 <div style={{ flex: 1, minWidth: 120 }}><label style={lab}>Última visita</label><input style={inp} value={manual.ultimaVisita} onChange={(e) => setManual({ ...manual, ultimaVisita: e.target.value })} placeholder="Opcional" /></div>
+                <div style={{ flex: 1, minWidth: 140 }}><label style={lab}>Fin de contrato</label><input type="date" style={inp} value={manual.finContrato} onChange={(e) => setManual({ ...manual, finContrato: e.target.value })} /></div>
                 <button style={{ ...btnVerde, alignSelf: "flex-end" }} onClick={agregarManual}><IconoMas /> Agregar socio</button>
               </div>
             </div>
@@ -435,16 +459,7 @@ export default function Sleepers({ perfil }) {
         onComentarios={abrirComentarios}
         onCambiarCampo={cambiarCampo}
         onMarcarEnvio={marcarEnvio}
-        onBorrar={borrarCaso}
       />
-
-      {adminAbierto && (
-        <PanelAdmin
-          casos={casos} seleccionados={seleccionados} setSeleccionados={setSeleccionados}
-          onEliminar={async (ids) => { if (confirm(`¿Eliminar ${ids.length} socio(s)? No se puede deshacer.`)) { try { await eliminarCasos(ids); setSeleccionados(new Set()); } catch (err) { alert(err.message); } } }}
-          onReasignar={async (ids, sede) => { try { await reasignarSede(ids, sede); setSeleccionados(new Set()); } catch (err) { alert(err.message); } }}
-        />
-      )}
 
       {modalMensaje && (
         <Modal onClose={() => setModalMensaje(null)} titulo={modalMensaje.nombre} subtitulo="Mensaje que se envía por WhatsApp o email">
@@ -487,7 +502,7 @@ function PanelFiltrosYListado({
   filtroSede, setFiltroSede, filtroEstado, setFiltroEstado, busqueda, setBusqueda,
   sedesDisponibles, conteoClave, esDireccion,
   comparativa, mejorRecup, totales, guardarTotal,
-  onVerMensaje, onComentarios, onCambiarCampo, onMarcarEnvio, onBorrar,
+  onVerMensaje, onComentarios, onCambiarCampo, onMarcarEnvio,
 }) {
   const s = estilos;
   const maxMotivo = Math.max(1, ...Object.values(motivoCounts));
@@ -585,12 +600,12 @@ function PanelFiltrosYListado({
       <p style={s.sectionTitle}>Listado de socios</p>
       <div style={{ ...s.tableWrap, overflowX: "auto" }}>
         <table style={{ width: "100%", fontSize: 12, borderCollapse: "collapse" }}>
-          <thead><tr>{["Alarma", "Socio", "Contacto", "Mensaje", "Motivo", "Riesgo", "Fecha carga", "Próximo seguimiento", "Estado", "Comentarios", ""].map((h) => (
+          <thead><tr>{["Alarma", "Socio", "Contacto", "Mensaje", "Motivo", "Riesgo", "Fin contrato", "Intención de volver", "Fecha carga", "Próximo seguimiento", "Estado", "Comentarios"].map((h) => (
             <th key={h} style={s.th}>{h}</th>
           ))}</tr></thead>
           <tbody>
             {filtrados.length === 0 && (
-              <tr><td colSpan={11} style={{ padding: 40, textAlign: "center", color: T.inkSoft, fontSize: 13 }}>
+              <tr><td colSpan={12} style={{ padding: 40, textAlign: "center", color: T.inkSoft, fontSize: 13 }}>
                 {casos.length ? "No hay socios que coincidan con el filtro actual." : "Todavía no cargaste ningún socio."}
               </td></tr>
             )}
@@ -601,13 +616,32 @@ function PanelFiltrosYListado({
               const hasPhone = c.telefono && c.telefono.length > 5;
               const hasEmail = c.email && c.email.includes("@");
               const vencido = c.fecha_seguimiento && c.fecha_seguimiento <= hoyStr() && c.estado === "Abierto";
+              const porVencerContrato = contratoPorVencer(c);
+              const riesgoColor = c.riesgo === "Alto" ? T.red : c.riesgo === "Medio" ? T.amber : c.riesgo === "Bajo" ? T.green : null;
               return (
-                <tr key={c.id} style={{ opacity: c.estado === "Cerrado" ? 0.55 : 1, background: isDup ? "rgba(255,69,58,0.06)" : "transparent" }}>
+                <tr key={c.id} style={{
+                  opacity: c.estado === "Cerrado" ? 0.55 : 1,
+                  background: isDup ? "rgba(255,69,58,0.06)" : "transparent",
+                  outline: porVencerContrato ? "2px solid " + T.red : "none",
+                  outlineOffset: "-2px",
+                }}>
                   <td style={s.td}>
-                    <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 10.5, fontWeight: 700, padding: "4px 9px", borderRadius: 999, background: alarma.bg, color: alarma.color }}>
-                      {alarma.check ? <IconoCheckCirculo tam={13} /> : <span style={{ width: 9, height: 9, borderRadius: "50%", background: alarma.color, display: "inline-block" }} />}
-                      {alarma.label}
-                    </span>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: "flex-start" }}>
+                      <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 10.5, fontWeight: 700, padding: "4px 9px", borderRadius: 999, background: alarma.bg, color: alarma.color }}>
+                        {alarma.check ? <IconoCheckCirculo tam={13} /> : <span style={{ width: 9, height: 9, borderRadius: "50%", background: alarma.color, display: "inline-block" }} />}
+                        {alarma.label}
+                      </span>
+                      {riesgoColor && (
+                        <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 999, background: riesgoColor + "26", color: riesgoColor }}>
+                          Riesgo {c.riesgo}
+                        </span>
+                      )}
+                      {porVencerContrato && (
+                        <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 999, background: T.redSoft, color: T.red, display: "inline-flex", alignItems: "center", gap: 4 }}>
+                          <IconoAlerta tam={11} /> Vence contrato
+                        </span>
+                      )}
+                    </div>
                   </td>
                   <td style={s.td}>
                     <div style={{ fontWeight: 600, fontSize: 13 }}>{c.nombre}{c.dni && <span style={{ color: T.inkSoft, fontWeight: 500, fontSize: 12 }}> · DNI {c.dni}</span>}</div>
@@ -636,15 +670,28 @@ function PanelFiltrosYListado({
                   <td style={s.td}><button style={s.smallBtn} onClick={() => onVerMensaje(c)}>Ver mensaje</button></td>
                   <td style={s.td}>
                     <select style={{ ...inp, padding: "6px 8px", fontSize: 12 }} value={c.motivo || ""}
-                      onChange={(e) => onCambiarCampo(c.id, { motivo: e.target.value, fecha_motivo_riesgo: hoyStr() })}>
+                      onChange={(e) => {
+                        const motivo = e.target.value;
+                        const riesgo = motivo ? (RIESGO_POR_MOTIVO[motivo] || "") : "";
+                        onCambiarCampo(c.id, { motivo, riesgo, fecha_motivo_riesgo: hoyStr() });
+                      }}>
                       <option value="">—</option>
                       {MOTIVOS.map((m) => <option key={m} value={m}>{m}</option>)}
                     </select>
                   </td>
                   <td style={s.td}>
-                    <select style={{ ...inp, padding: "6px 8px", fontSize: 12 }} value={c.riesgo || ""}
+                    <select style={{ ...inp, padding: "6px 8px", fontSize: 12, opacity: c.motivo ? 0.6 : 1, cursor: c.motivo ? "not-allowed" : "pointer" }}
+                      value={c.riesgo || ""} disabled={!!c.motivo}
+                      title={c.motivo ? "Se calcula solo según el motivo. Borrá el motivo para editarlo a mano." : ""}
                       onChange={(e) => onCambiarCampo(c.id, { riesgo: e.target.value, fecha_motivo_riesgo: hoyStr() })}>
                       <option value="">—</option><option value="Alto">Alto</option><option value="Medio">Medio</option><option value="Bajo">Bajo</option>
+                    </select>
+                  </td>
+                  <td style={{ ...s.td, color: porVencerContrato ? T.red : T.inkSoft, fontWeight: porVencerContrato ? 700 : 400 }}>{fmt(c.fecha_fin_contrato)}</td>
+                  <td style={s.td}>
+                    <select style={{ ...inp, padding: "6px 8px", fontSize: 12 }} value={c.intencion_volver || ""}
+                      onChange={(e) => onCambiarCampo(c.id, { intencion_volver: e.target.value || null })}>
+                      <option value="">Sin definir</option><option value="Si">Sí</option><option value="No">No</option>
                     </select>
                   </td>
                   <td style={{ ...s.td, color: T.inkSoft }}>{fmt(c.fecha_carga)}</td>
@@ -671,7 +718,6 @@ function PanelFiltrosYListado({
                       <IconoChat /> Comentarios {c._numComentarios > 0 && <span style={{ background: T.marca, color: "#fff", fontSize: 10, fontWeight: 700, padding: "1px 6px", borderRadius: 7, marginLeft: 4 }}>{c._numComentarios}</span>}
                     </button>
                   </td>
-                  <td style={s.td}><button onClick={() => onBorrar(c.id)} style={{ background: "none", border: "none", color: T.inkSoft, cursor: "pointer" }}><IconoBasura /></button></td>
                 </tr>
               );
             })}
@@ -682,40 +728,6 @@ function PanelFiltrosYListado({
   );
 }
 
-function PanelAdmin({ casos, seleccionados, setSeleccionados, onEliminar, onReasignar }) {
-  const s = estilos;
-  const [nuevaSede, setNuevaSede] = useState("");
-  function toggle(id) {
-    setSeleccionados((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
-  }
-  return (
-    <div style={{ background: T.surface, border: "1px solid " + T.marca, borderRadius: 16, padding: 20, marginBottom: 26 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 10 }}>
-        <span style={{ fontSize: 13, fontWeight: 800, textTransform: "uppercase", display: "flex", alignItems: "center", gap: 8 }}><IconoCandado tam={18} /> Administración</span>
-      </div>
-      <p style={{ fontSize: 11.5, color: T.inkSoft, marginBottom: 14 }}>Seleccioná socios para eliminar en bloque o reasignar de sede.</p>
-      <div style={{ display: "flex", gap: 10, marginBottom: 14, flexWrap: "wrap" }}>
-        <input style={{ ...inp, maxWidth: 220 }} placeholder="Nueva sede para seleccionados" value={nuevaSede} onChange={(e) => setNuevaSede(e.target.value)} />
-        <button style={s.ghostBtn} onClick={() => { if (!seleccionados.size) return alert("Seleccioná al menos un socio."); if (!nuevaSede.trim()) return alert("Escribí la sede."); onReasignar([...seleccionados], nuevaSede.trim()); setNuevaSede(""); }}><IconoPin /> Reasignar sede</button>
-        <button style={{ ...btnOut, color: T.red, borderColor: T.red }} onClick={() => { if (!seleccionados.size) return alert("Seleccioná al menos un socio."); onEliminar([...seleccionados]); }}><IconoBasura /> Eliminar seleccionados</button>
-      </div>
-      <div style={{ maxHeight: 380, overflow: "auto", border: "1px solid " + T.line, borderRadius: 11 }}>
-        <table style={{ width: "100%", fontSize: 12, borderCollapse: "collapse" }}>
-          <thead><tr>{["", "Nombre", "DNI", "Sede", "Cargado por", "Estado"].map((h) => <th key={h} style={s.th}>{h}</th>)}</tr></thead>
-          <tbody>{casos.map((c) => (
-            <tr key={c.id}>
-              <td style={s.td}><input type="checkbox" checked={seleccionados.has(c.id)} onChange={() => toggle(c.id)} /></td>
-              <td style={s.td}>{c.nombre}</td><td style={{ ...s.td, color: T.inkSoft }}>{c.dni || "—"}</td>
-              <td style={s.td}><Badge tone="gris">{c.sede}</Badge></td>
-              <td style={{ ...s.td, color: T.inkSoft }}>{c.subido_por || "—"}</td>
-              <td style={{ ...s.td, color: T.inkSoft }}>{c.estado}</td>
-            </tr>
-          ))}</tbody>
-        </table>
-      </div>
-    </div>
-  );
-}
 
 function Modal({ onClose, titulo, subtitulo, children }) {
   return (
