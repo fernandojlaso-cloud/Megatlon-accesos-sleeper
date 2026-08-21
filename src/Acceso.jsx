@@ -21,13 +21,15 @@ export const SEDES = [
 export const ROL_LABEL = {
   director: "Direccion",
   gerente: "Gerente",
-  vendedor: "Ventas",
-  profesor: "Profesor",
-  control_acceso: "Control de acceso",
+  gerente_servicio: "Gerente de Servicio",
+  coordinador_servicio: "Coordinador de Servicio",
+  referente_servicio: "Referente de Servicio",
 };
 
-const ROLES_PEDIBLES = ["gerente", "vendedor", "profesor", "control_acceso"];
-const ROLES_ASIGNABLES = ["gerente", "vendedor", "profesor", "control_acceso"];
+const ROLES_PEDIBLES = ["gerente", "gerente_servicio", "coordinador_servicio", "referente_servicio"];
+// Lo que puede asignar CUALQUIER aprobador (incluido el Gerente). Direccion
+// ademas puede asignar "gerente" y "director" — ver mas abajo donde se usa.
+const ROLES_ASIGNABLES = ["gerente_servicio", "coordinador_servicio", "referente_servicio"];
 
 /* ============================================================
    HOOK DE SESION
@@ -267,6 +269,7 @@ export function Equipo({ perfil }) {
               <label style={{ ...lab, fontSize: 11 }}>Rol que le asignas</label>
               <select value={valorRol(u)} onChange={(e) => cambiar(u.id, "rol", e.target.value)} style={{ ...inp, padding: "10px 12px" }}>
                 {ROLES_ASIGNABLES.map((r) => <option key={r} value={r}>{ROL_LABEL[r]}</option>)}
+                {esDireccion && <option value="gerente">Gerente</option>}
                 {esDireccion && <option value="director">Direccion</option>}
               </select>
             </div>
@@ -344,6 +347,18 @@ export function Actividad({ limite = 60 }) {
     insert: ["Registro creado", "green"],
     update: ["Registro modificado", "blue"],
     delete: ["Registro borrado", "red"],
+    socio_cargado: ["Socio cargado", "green"],
+    socio_eliminado: ["Socio eliminado", "red"],
+    socio_modificado: ["Socio modificado", "blue"],
+    estado_cambiado: ["Estado cambiado", "amber"],
+    motivo_cargado: ["Motivo cargado", "blue"],
+    riesgo_actualizado: ["Riesgo actualizado", "amber"],
+    sede_reasignada: ["Sede reasignada", "blue"],
+    mensaje_enviado: ["Mensaje enviado", "green"],
+    seguimiento_programado: ["Seguimiento programado", "blue"],
+    intencion_volver_cargada: ["Intención de volver cargada", "blue"],
+    datos_corregidos: ["Datos corregidos", "amber"],
+    comentario_agregado: ["Comentario agregado", "blue"],
   };
 
   const fmt = (iso) => iso

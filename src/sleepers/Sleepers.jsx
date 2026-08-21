@@ -159,8 +159,14 @@ export default function Sleepers({ perfil }) {
   );
 
   const esDireccion = perfil.rol === "director";
-  const puedeCargar = ["director", "gerente", "vendedor"].includes(perfil.rol);
-  const cargoLabel = { director: "Director", gerente: "Gerente", vendedor: "Vendedor", profesor: "Profesor", control_acceso: "Control de acceso" }[perfil.rol] || "Gerente";
+  const puedeEditarIdentidad = ["director", "gerente"].includes(perfil.rol);
+  const puedeCargar = ["director", "gerente", "gerente_servicio", "coordinador_servicio", "referente_servicio"].includes(perfil.rol);
+  const cargoLabel = {
+    director: "Director", gerente: "Gerente",
+    gerente_servicio: "Gerente de Servicio",
+    coordinador_servicio: "Coordinador de Servicio",
+    referente_servicio: "Referente de Servicio",
+  }[perfil.rol] || "Gerente";
 
   const [boAbierto, setBoAbierto] = useState(false);
   const [boTocado, setBoTocado] = useState(false);
@@ -174,6 +180,10 @@ export default function Sleepers({ perfil }) {
   const [filtroSede, setFiltroSede] = useState("");
   const [filtroEstado, setFiltroEstado] = useState("Abierto");
   const [busqueda, setBusqueda] = useState("");
+  const [filtroRiesgo, setFiltroRiesgo] = useState("");
+  const [filtroIntencion, setFiltroIntencion] = useState("");
+  const [filtroFinDesde, setFiltroFinDesde] = useState("");
+  const [filtroFinHasta, setFiltroFinHasta] = useState("");
   const [modalMensaje, setModalMensaje] = useState(null);
   const [modalComentarios, setModalComentarios] = useState(null);
   const [nuevoComentario, setNuevoComentario] = useState("");
@@ -185,27 +195,37 @@ export default function Sleepers({ perfil }) {
     [casos]
   );
 
-  const filtrados = useMemo(() => casos.filter((c) => {
+  function pasaFiltrosComunes(c) {
     if (filtroSede && c.sede !== filtroSede) return false;
-    if (filtroEstado && c.estado !== filtroEstado) return false;
     const b = norm(busqueda);
     if (b && !(norm(c.nombre).includes(b) || norm(c.email).includes(b) || norm(c.dni).includes(b))) return false;
+    if (filtroRiesgo && c.riesgo !== filtroRiesgo) return false;
+    if (filtroIntencion === "SinDefinir" ? !!c.intencion_volver : (filtroIntencion && c.intencion_volver !== filtroIntencion)) return false;
+    if (filtroFinDesde && (!c.fecha_fin_contrato || c.fecha_fin_contrato < filtroFinDesde)) return false;
+    if (filtroFinHasta && (!c.fecha_fin_contrato || c.fecha_fin_contrato > filtroFinHasta)) return false;
     return true;
-  }), [casos, filtroSede, filtroEstado, busqueda]);
+  }
+
+  const filtrados = useMemo(() => casos.filter((c) => {
+    if (filtroEstado && c.estado !== filtroEstado) return false;
+    return pasaFiltrosComunes(c);
+  }), [casos, filtroSede, filtroEstado, busqueda, filtroRiesgo, filtroIntencion, filtroFinDesde, filtroFinHasta]);
 
   // Las estadisticas siempre reflejan el total (ignoran el filtro de Estado).
-  const statsSet = useMemo(() => casos.filter((c) => {
-    if (filtroSede && c.sede !== filtroSede) return false;
-    const b = norm(busqueda);
-    if (b && !(norm(c.nombre).includes(b) || norm(c.email).includes(b) || norm(c.dni).includes(b))) return false;
-    return true;
-  }), [casos, filtroSede, busqueda]);
+  const statsSet = useMemo(() => casos.filter((c) => pasaFiltrosComunes(c)),
+    [casos, filtroSede, busqueda, filtroRiesgo, filtroIntencion, filtroFinDesde, filtroFinHasta]);
 
   const conteoClave = useMemo(() => {
     const map = {};
     casos.forEach((c) => { const k = norm(c.dni) || norm(c.email) || norm(c.nombre); map[k] = (map[k] || 0) + 1; });
     return map;
   }, [casos]);
+
+  const conteoIntencion = useMemo(() => {
+    const r = { Si: 0, No: 0, SinDefinir: 0 };
+    statsSet.forEach((c) => { r[c.intencion_volver || "SinDefinir"]++; });
+    return r;
+  }, [statsSet]);
 
   /* ---------- carga por archivo ---------- */
   async function onFileChange(e) {
@@ -448,12 +468,16 @@ export default function Sleepers({ perfil }) {
 
       <PanelFiltrosYListado
         casos={casos} filtrados={filtrados} statsSet={statsSet} stats={stats}
-        motivoCounts={motivoCounts} riesgoCounts={riesgoCounts}
+        motivoCounts={motivoCounts} riesgoCounts={riesgoCounts} conteoIntencion={conteoIntencion}
         filtroSede={filtroSede} setFiltroSede={setFiltroSede}
         filtroEstado={filtroEstado} setFiltroEstado={setFiltroEstado}
         busqueda={busqueda} setBusqueda={setBusqueda}
+        filtroRiesgo={filtroRiesgo} setFiltroRiesgo={setFiltroRiesgo}
+        filtroIntencion={filtroIntencion} setFiltroIntencion={setFiltroIntencion}
+        filtroFinDesde={filtroFinDesde} setFiltroFinDesde={setFiltroFinDesde}
+        filtroFinHasta={filtroFinHasta} setFiltroFinHasta={setFiltroFinHasta}
         sedesDisponibles={sedesDisponibles} conteoClave={conteoClave}
-        esDireccion={esDireccion}
+        esDireccion={esDireccion} puedeEditarIdentidad={puedeEditarIdentidad}
         comparativa={comparativa} mejorRecup={mejorRecup} totales={totales} guardarTotal={guardarTotal}
         onVerMensaje={(c) => setModalMensaje(c)}
         onComentarios={abrirComentarios}
@@ -498,9 +522,11 @@ export default function Sleepers({ perfil }) {
    Filtros + estadisticas + graficos + comparativa + tabla
    ============================================================ */
 function PanelFiltrosYListado({
-  casos, filtrados, statsSet, stats, motivoCounts, riesgoCounts,
+  casos, filtrados, statsSet, stats, motivoCounts, riesgoCounts, conteoIntencion,
   filtroSede, setFiltroSede, filtroEstado, setFiltroEstado, busqueda, setBusqueda,
-  sedesDisponibles, conteoClave, esDireccion,
+  filtroRiesgo, setFiltroRiesgo, filtroIntencion, setFiltroIntencion,
+  filtroFinDesde, setFiltroFinDesde, filtroFinHasta, setFiltroFinHasta,
+  sedesDisponibles, conteoClave, esDireccion, puedeEditarIdentidad,
   comparativa, mejorRecup, totales, guardarTotal,
   onVerMensaje, onComentarios, onCambiarCampo, onMarcarEnvio,
 }) {
@@ -508,10 +534,12 @@ function PanelFiltrosYListado({
   const maxMotivo = Math.max(1, ...Object.values(motivoCounts));
   const maxRiesgo = Math.max(1, ...Object.values(riesgoCounts));
   const maxCargados = Math.max(1, ...comparativa.map((c) => c.total));
+  const maxIntencion = Math.max(1, conteoIntencion.Si, conteoIntencion.No, conteoIntencion.SinDefinir);
+  const hayFiltrosExtra = filtroRiesgo || filtroIntencion || filtroFinDesde || filtroFinHasta;
 
   return (
     <div>
-      <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "flex-end", marginBottom: 16 }}>
+      <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "flex-end", marginBottom: 10 }}>
         <div style={{ minWidth: 160 }}>
           <label style={lab}>Sede</label>
           <select style={inp} value={filtroSede} onChange={(e) => setFiltroSede(e.target.value)}>
@@ -532,7 +560,34 @@ function PanelFiltrosYListado({
           <input style={inp} value={busqueda} onChange={(e) => setBusqueda(e.target.value)} placeholder="Nombre, DNI o email..." />
         </div>
       </div>
-      <p style={{ fontSize: 11.5, color: T.inkSoft, margin: "-8px 0 12px" }}>Las estadísticas siempre muestran el total de socios (incluye recuperados y dados de baja). El filtro de Estado solo afecta al listado de abajo.</p>
+      <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "flex-end", marginBottom: 10 }}>
+        <div style={{ minWidth: 140 }}>
+          <label style={lab}>Riesgo</label>
+          <select style={inp} value={filtroRiesgo} onChange={(e) => setFiltroRiesgo(e.target.value)}>
+            <option value="">Todos</option><option value="Alto">Alto</option><option value="Medio">Medio</option><option value="Bajo">Bajo</option>
+          </select>
+        </div>
+        <div style={{ minWidth: 160 }}>
+          <label style={lab}>Intención de volver</label>
+          <select style={inp} value={filtroIntencion} onChange={(e) => setFiltroIntencion(e.target.value)}>
+            <option value="">Todas</option><option value="Si">Sí</option><option value="No">No</option><option value="SinDefinir">Sin definir</option>
+          </select>
+        </div>
+        <div style={{ minWidth: 150 }}>
+          <label style={lab}>Fin de contrato desde</label>
+          <input type="date" style={inp} value={filtroFinDesde} onChange={(e) => setFiltroFinDesde(e.target.value)} />
+        </div>
+        <div style={{ minWidth: 150 }}>
+          <label style={lab}>Fin de contrato hasta</label>
+          <input type="date" style={inp} value={filtroFinHasta} onChange={(e) => setFiltroFinHasta(e.target.value)} />
+        </div>
+        {hayFiltrosExtra && (
+          <button style={s.ghostBtn} onClick={() => { setFiltroRiesgo(""); setFiltroIntencion(""); setFiltroFinDesde(""); setFiltroFinHasta(""); }}>
+            <IconoX /> Limpiar filtros
+          </button>
+        )}
+      </div>
+      <p style={{ fontSize: 11.5, color: T.inkSoft, margin: "-4px 0 12px" }}>Las estadísticas siempre muestran el total de socios (incluye recuperados y dados de baja). El filtro de Estado solo afecta al listado de abajo — el resto de los filtros afecta a todo.</p>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(140px,1fr))", gap: 12, marginBottom: 26 }}>
         <StatCard n={stats.total} l="Total de socios" color={T.marca} />
@@ -544,7 +599,7 @@ function PanelFiltrosYListado({
         <StatCard n={stats.reincidentes} l="Reincidentes" color={stats.reincidentes > 0 ? T.red : T.line} />
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 30 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
         <div style={s.card}>
           <p style={s.sectionTitle}>Distribución por motivo</p>
           {MOTIVOS.map((m) => <BarRow key={m} label={m} val={motivoCounts[m]} max={maxMotivo} color={T.marca} />)}
@@ -555,6 +610,26 @@ function PanelFiltrosYListado({
             <BarRow key={r} label={r} val={riesgoCounts[r]} max={maxRiesgo}
               color={r === "Alto" ? T.red : r === "Medio" ? T.amber : T.green} />
           ))}
+        </div>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 30 }}>
+        <div style={s.card}>
+          <p style={s.sectionTitle}>Intención de volver — total</p>
+          <BarRow label="Total respondió" val={conteoIntencion.Si + conteoIntencion.No} max={Math.max(1, statsSet.length)} color={T.marca} />
+          <BarRow label="Sí" val={conteoIntencion.Si} max={Math.max(1, statsSet.length)} color={T.green} />
+          <BarRow label="No" val={conteoIntencion.No} max={Math.max(1, statsSet.length)} color={T.red} />
+          <BarRow label="Sin definir" val={conteoIntencion.SinDefinir} max={Math.max(1, statsSet.length)} color={T.line} />
+        </div>
+        <div style={s.card}>
+          <p style={s.sectionTitle}>Intención de volver — Sí vs No</p>
+          <BarRow label="Sí" val={conteoIntencion.Si} max={maxIntencion} color={T.green} />
+          <BarRow label="No" val={conteoIntencion.No} max={maxIntencion} color={T.red} />
+          <p style={{ fontSize: 11.5, color: T.inkSoft, marginTop: 10 }}>
+            {conteoIntencion.Si + conteoIntencion.No > 0
+              ? `${Math.round((conteoIntencion.Si / (conteoIntencion.Si + conteoIntencion.No)) * 100)}% de los que respondieron dicen que sí vuelven.`
+              : "Todavía nadie respondió esta pregunta."}
+          </p>
         </div>
       </div>
 
@@ -644,8 +719,22 @@ function PanelFiltrosYListado({
                     </div>
                   </td>
                   <td style={s.td}>
-                    <div style={{ fontWeight: 600, fontSize: 13 }}>{c.nombre}{c.dni && <span style={{ color: T.inkSoft, fontWeight: 500, fontSize: 12 }}> · DNI {c.dni}</span>}</div>
-                    <Badge tone="gris">{c.sede || "—"}</Badge>
+                    {puedeEditarIdentidad ? (
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 5, alignItems: "center", marginBottom: 4 }}>
+                        <input defaultValue={c.nombre} onBlur={(e) => { const v = e.target.value.trim(); if (v && v !== c.nombre) onCambiarCampo(c.id, { nombre: v }); }}
+                          style={{ ...inp, padding: "4px 7px", fontSize: 13, fontWeight: 600, width: 140 }} />
+                        <input defaultValue={c.dni || ""} placeholder="DNI" onBlur={(e) => { const v = e.target.value.trim(); if (v !== (c.dni || "")) onCambiarCampo(c.id, { dni: v || null }); }}
+                          style={{ ...inp, padding: "4px 7px", fontSize: 12, width: 90 }} />
+                      </div>
+                    ) : (
+                      <div style={{ fontWeight: 600, fontSize: 13 }}>{c.nombre}{c.dni && <span style={{ color: T.inkSoft, fontWeight: 500, fontSize: 12 }}> · DNI {c.dni}</span>}</div>
+                    )}
+                    {puedeEditarIdentidad ? (
+                      <input defaultValue={c.sede} onBlur={(e) => { const v = e.target.value.trim(); if (v && v !== c.sede) onCambiarCampo(c.id, { sede: v }); }}
+                        style={{ ...inp, padding: "4px 7px", fontSize: 11.5, width: 130, marginBottom: 4 }} />
+                    ) : (
+                      <Badge tone="gris">{c.sede || "—"}</Badge>
+                    )}
                     {isDup && <span style={{ marginLeft: 6 }}><Badge tone="red">Reincidente ({conteoClave[key]})</Badge></span>}
                     {c.subido_por && <div style={{ fontSize: 11, color: T.inkSoft, marginTop: 2 }}>Cargado por: {c.subido_por}{c.cargo_subido_por ? " · " + c.cargo_subido_por : ""}</div>}
                   </td>
@@ -665,7 +754,16 @@ function PanelFiltrosYListado({
                         : <span style={s.disabledBtn}><IconoMail /> Sin email</span>}
                     </div>
                     <div style={{ fontSize: 11, color: T.inkSoft, marginTop: 4 }}>{c.fecha_envio_mensaje ? "Enviado: " + fmt(c.fecha_envio_mensaje) : "Sin enviar"}</div>
-                    <div style={{ fontSize: 11, color: T.inkSoft }}>{c.email || "—"}</div>
+                    {puedeEditarIdentidad ? (
+                      <div style={{ display: "flex", flexDirection: "column", gap: 4, marginTop: 4 }}>
+                        <input defaultValue={c.email || ""} placeholder="Email" onBlur={(e) => { const v = e.target.value.trim(); if (v !== (c.email || "")) onCambiarCampo(c.id, { email: v || null }); }}
+                          style={{ ...inp, padding: "4px 7px", fontSize: 11 }} />
+                        <input defaultValue={c.telefono || ""} placeholder="Teléfono" onBlur={(e) => { const v = e.target.value.trim().replace(/[^\d]/g, ""); if (v !== (c.telefono || "")) onCambiarCampo(c.id, { telefono: v || null }); }}
+                          style={{ ...inp, padding: "4px 7px", fontSize: 11 }} />
+                      </div>
+                    ) : (
+                      <div style={{ fontSize: 11, color: T.inkSoft }}>{c.email || "—"}</div>
+                    )}
                   </td>
                   <td style={s.td}><button style={s.smallBtn} onClick={() => onVerMensaje(c)}>Ver mensaje</button></td>
                   <td style={s.td}>

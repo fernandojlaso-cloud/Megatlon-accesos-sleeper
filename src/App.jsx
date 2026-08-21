@@ -10,7 +10,7 @@ import Administrador from "./sleepers/Administrador.jsx";
    Reemplaza el contenido de las solapas por lo tuyo.
    ============================================================ */
 
-const TITULO = "SISTEMA";
+const TITULO = "SLEEPER MEGATLON";
 
 export default function App() {
   const { sesion, perfil, cargando, salir } = useSesion();
