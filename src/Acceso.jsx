@@ -85,7 +85,7 @@ export function Auth({ titulo = "Sistema", subtitulo = "" }) {
       if (!email.trim().toLowerCase().endsWith("@" + DOMINIO))
         return setMsg({ tipo: "err", txt: "Solo se permiten correos @" + DOMINIO });
       if (!nombre.trim()) return setMsg({ tipo: "err", txt: "Escribi tu nombre y apellido" });
-      if (!sede) return setMsg({ tipo: "err", txt: "Elegi tu sede" });
+      if (rol !== "supervisor" && !sede) return setMsg({ tipo: "err", txt: "Elegi tu sede" });
       if (pass.length < 8) return setMsg({ tipo: "err", txt: "La contrasena necesita al menos 8 caracteres" });
     }
     setCargando(true);
@@ -93,7 +93,7 @@ export function Auth({ titulo = "Sistema", subtitulo = "" }) {
       if (modo === "registro") {
         const { error } = await supabase.auth.signUp({
           email: email.trim().toLowerCase(), password: pass,
-          options: { data: { nombre: nombre.trim(), rol, sede }, emailRedirectTo: window.location.origin },
+          options: { data: { nombre: nombre.trim(), rol, sede: rol === "supervisor" ? "Todas" : sede }, emailRedirectTo: window.location.origin },
         });
         if (error) throw error;
         setMsg({ tipo: "ok", txt: "Cuenta creada. Revisa tu correo para confirmarla. Despues de confirmar, tu acceso queda pendiente de autorizacion." });
@@ -148,11 +148,19 @@ export function Auth({ titulo = "Sistema", subtitulo = "" }) {
               <select value={rol} onChange={(e) => setRol(e.target.value)} style={{ ...inp, marginBottom: 16 }}>
                 {ROLES_PEDIBLES.map((r) => <option key={r} value={r}>{ROL_LABEL[r]}</option>)}
               </select>
-              <label style={lab}>Sede</label>
-              <select value={sede} onChange={(e) => setSede(e.target.value)} style={{ ...inp, color: sede ? T.ink : T.inkSoft }}>
-                <option value="">Elegi tu sede...</option>
-                {SEDES.map((s) => <option key={s} value={s}>{s}</option>)}
-              </select>
+              {rol === "supervisor" ? (
+                <div style={{ fontSize: 12, color: T.inkSoft, marginBottom: 4 }}>
+                  El Supervisor ve todas las sedes, no hace falta elegir una.
+                </div>
+              ) : (
+                <>
+                  <label style={lab}>Sede</label>
+                  <select value={sede} onChange={(e) => setSede(e.target.value)} style={{ ...inp, color: sede ? T.ink : T.inkSoft }}>
+                    <option value="">Elegi tu sede...</option>
+                    {SEDES.map((s) => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                </>
+              )}
             </>
           )}
 
