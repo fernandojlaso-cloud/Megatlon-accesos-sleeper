@@ -63,9 +63,21 @@ ${cargoLabel || "Gerente"} | Megatlon ${s}`;
 }
 
 function waLink(telefono, msg) { return "https://wa.me/" + telefono + "?text=" + encodeURIComponent(msg); }
+
+// El email ya lleva firma propia del cliente de correo (Gmail/Outlook), asi que
+// para email sacamos el cierre "Nombre / Cargo | Megatlon Sede" y dejamos el
+// cuerpo hasta el agradecimiento. Los datos del gerente ya quedan mencionados
+// arriba, en "Soy fulano, gerente de Megatlon tal sede."
+const ANCLA_FIN_MENSAJE = "Te agradezco mucho el tiempo para responder este mensaje.";
+function mensajeSinFirma(mensajeCompleto) {
+  const idx = (mensajeCompleto || "").indexOf(ANCLA_FIN_MENSAJE);
+  if (idx === -1) return mensajeCompleto;
+  return mensajeCompleto.slice(0, idx + ANCLA_FIN_MENSAJE.length);
+}
+
 function mailLink(email, nombre, msg) {
   const asunto = `Te extrañamos en Megatlon, ${(nombre || "").trim().split(" ")[0]}`;
-  return "mailto:" + email + "?subject=" + encodeURIComponent(asunto) + "&body=" + encodeURIComponent(msg);
+  return "mailto:" + email + "?subject=" + encodeURIComponent(asunto) + "&body=" + encodeURIComponent(mensajeSinFirma(msg));
 }
 function contactoPersonal(motivo, riesgo) {
   if (motivo === "Problemas con el servicio" || riesgo === "Alto") return "si";
@@ -184,6 +196,8 @@ export default function Sleepers({ perfil }) {
   const [filtroIntencion, setFiltroIntencion] = useState("");
   const [filtroFinDesde, setFiltroFinDesde] = useState("");
   const [filtroFinHasta, setFiltroFinHasta] = useState("");
+  const [filtroSegDesde, setFiltroSegDesde] = useState("");
+  const [filtroSegHasta, setFiltroSegHasta] = useState("");
   const [modalMensaje, setModalMensaje] = useState(null);
   const [modalComentarios, setModalComentarios] = useState(null);
   const [nuevoComentario, setNuevoComentario] = useState("");
@@ -203,17 +217,19 @@ export default function Sleepers({ perfil }) {
     if (filtroIntencion === "SinDefinir" ? !!c.intencion_volver : (filtroIntencion && c.intencion_volver !== filtroIntencion)) return false;
     if (filtroFinDesde && (!c.fecha_fin_contrato || c.fecha_fin_contrato < filtroFinDesde)) return false;
     if (filtroFinHasta && (!c.fecha_fin_contrato || c.fecha_fin_contrato > filtroFinHasta)) return false;
+    if (filtroSegDesde && (!c.fecha_seguimiento || c.fecha_seguimiento < filtroSegDesde)) return false;
+    if (filtroSegHasta && (!c.fecha_seguimiento || c.fecha_seguimiento > filtroSegHasta)) return false;
     return true;
   }
 
   const filtrados = useMemo(() => casos.filter((c) => {
     if (filtroEstado && c.estado !== filtroEstado) return false;
     return pasaFiltrosComunes(c);
-  }), [casos, filtroSede, filtroEstado, busqueda, filtroRiesgo, filtroIntencion, filtroFinDesde, filtroFinHasta]);
+  }), [casos, filtroSede, filtroEstado, busqueda, filtroRiesgo, filtroIntencion, filtroFinDesde, filtroFinHasta, filtroSegDesde, filtroSegHasta]);
 
   // Las estadisticas siempre reflejan el total (ignoran el filtro de Estado).
   const statsSet = useMemo(() => casos.filter((c) => pasaFiltrosComunes(c)),
-    [casos, filtroSede, busqueda, filtroRiesgo, filtroIntencion, filtroFinDesde, filtroFinHasta]);
+    [casos, filtroSede, busqueda, filtroRiesgo, filtroIntencion, filtroFinDesde, filtroFinHasta, filtroSegDesde, filtroSegHasta]);
 
   const conteoClave = useMemo(() => {
     const map = {};
@@ -476,6 +492,8 @@ export default function Sleepers({ perfil }) {
         filtroIntencion={filtroIntencion} setFiltroIntencion={setFiltroIntencion}
         filtroFinDesde={filtroFinDesde} setFiltroFinDesde={setFiltroFinDesde}
         filtroFinHasta={filtroFinHasta} setFiltroFinHasta={setFiltroFinHasta}
+        filtroSegDesde={filtroSegDesde} setFiltroSegDesde={setFiltroSegDesde}
+        filtroSegHasta={filtroSegHasta} setFiltroSegHasta={setFiltroSegHasta}
         sedesDisponibles={sedesDisponibles} conteoClave={conteoClave}
         esDireccion={esDireccion} puedeEditarIdentidad={puedeEditarIdentidad}
         comparativa={comparativa} mejorRecup={mejorRecup} totales={totales} guardarTotal={guardarTotal}
@@ -526,6 +544,7 @@ function PanelFiltrosYListado({
   filtroSede, setFiltroSede, filtroEstado, setFiltroEstado, busqueda, setBusqueda,
   filtroRiesgo, setFiltroRiesgo, filtroIntencion, setFiltroIntencion,
   filtroFinDesde, setFiltroFinDesde, filtroFinHasta, setFiltroFinHasta,
+  filtroSegDesde, setFiltroSegDesde, filtroSegHasta, setFiltroSegHasta,
   sedesDisponibles, conteoClave, esDireccion, puedeEditarIdentidad,
   comparativa, mejorRecup, totales, guardarTotal,
   onVerMensaje, onComentarios, onCambiarCampo, onMarcarEnvio,
@@ -535,7 +554,7 @@ function PanelFiltrosYListado({
   const maxRiesgo = Math.max(1, ...Object.values(riesgoCounts));
   const maxCargados = Math.max(1, ...comparativa.map((c) => c.total));
   const maxIntencion = Math.max(1, conteoIntencion.Si, conteoIntencion.No, conteoIntencion.SinDefinir);
-  const hayFiltrosExtra = filtroRiesgo || filtroIntencion || filtroFinDesde || filtroFinHasta;
+  const hayFiltrosExtra = filtroRiesgo || filtroIntencion || filtroFinDesde || filtroFinHasta || filtroSegDesde || filtroSegHasta;
 
   return (
     <div>
@@ -581,8 +600,16 @@ function PanelFiltrosYListado({
           <label style={lab}>Fin de contrato hasta</label>
           <input type="date" style={inp} value={filtroFinHasta} onChange={(e) => setFiltroFinHasta(e.target.value)} />
         </div>
+        <div style={{ minWidth: 150 }}>
+          <label style={lab}>Próximo seguimiento desde</label>
+          <input type="date" style={inp} value={filtroSegDesde} onChange={(e) => setFiltroSegDesde(e.target.value)} />
+        </div>
+        <div style={{ minWidth: 150 }}>
+          <label style={lab}>Próximo seguimiento hasta</label>
+          <input type="date" style={inp} value={filtroSegHasta} onChange={(e) => setFiltroSegHasta(e.target.value)} />
+        </div>
         {hayFiltrosExtra && (
-          <button style={s.ghostBtn} onClick={() => { setFiltroRiesgo(""); setFiltroIntencion(""); setFiltroFinDesde(""); setFiltroFinHasta(""); }}>
+          <button style={s.ghostBtn} onClick={() => { setFiltroRiesgo(""); setFiltroIntencion(""); setFiltroFinDesde(""); setFiltroFinHasta(""); setFiltroSegDesde(""); setFiltroSegHasta(""); }}>
             <IconoX /> Limpiar filtros
           </button>
         )}

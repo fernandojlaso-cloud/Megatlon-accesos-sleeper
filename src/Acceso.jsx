@@ -20,6 +20,7 @@ export const SEDES = [
 
 export const ROL_LABEL = {
   director: "Direccion",
+  supervisor: "Supervisor",
   gerente: "Gerente",
   gerente_servicio: "Gerente de Servicio",
   coordinador_servicio: "Coordinador de Servicio",
@@ -270,6 +271,7 @@ export function Equipo({ perfil }) {
               <select value={valorRol(u)} onChange={(e) => cambiar(u.id, "rol", e.target.value)} style={{ ...inp, padding: "10px 12px" }}>
                 {ROLES_ASIGNABLES.map((r) => <option key={r} value={r}>{ROL_LABEL[r]}</option>)}
                 {esDireccion && <option value="gerente">Gerente</option>}
+                {esDireccion && <option value="supervisor">Supervisor</option>}
                 {esDireccion && <option value="director">Direccion</option>}
               </select>
             </div>
