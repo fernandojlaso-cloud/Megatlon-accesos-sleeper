@@ -42,7 +42,7 @@ export default function App() {
     ? [["panorama", "Panorama"]]
     : [
         ["sleepers", "Sleepers"],
-        ...(esDireccion ? [["administrador", "Administrador"]] : []),
+        ...(esDireccion ? [["panorama", "Panorama"], ["administrador", "Administrador"]] : []),
         ...(puedeEquipo ? [["equipo", "Equipo"], ["actividad", "Actividad"]] : []),
       ];
   const solapaActual = esSupervisor ? "panorama" : solapa;
@@ -87,7 +87,7 @@ export default function App() {
         {solapaActual === "administrador" && esDireccion && <Administrador />}
         {solapaActual === "equipo" && puedeEquipo && <Equipo perfil={perfil} />}
         {solapaActual === "actividad" && puedeEquipo && <Actividad />}
-        {solapaActual === "panorama" && esSupervisor && <Supervisor />}
+        {solapaActual === "panorama" && (esSupervisor || esDireccion) && <Supervisor />}
       </main>
     </div>
   );

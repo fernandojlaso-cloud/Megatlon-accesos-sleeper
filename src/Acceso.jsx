@@ -27,7 +27,7 @@ export const ROL_LABEL = {
   referente_servicio: "Referente de Servicio",
 };
 
-const ROLES_PEDIBLES = ["gerente", "gerente_servicio", "coordinador_servicio", "referente_servicio"];
+const ROLES_PEDIBLES = ["gerente", "supervisor", "gerente_servicio", "coordinador_servicio", "referente_servicio"];
 // Lo que puede asignar CUALQUIER aprobador (incluido el Gerente). Direccion
 // ademas puede asignar "gerente" y "director" — ver mas abajo donde se usa.
 const ROLES_ASIGNABLES = ["gerente_servicio", "coordinador_servicio", "referente_servicio"];
