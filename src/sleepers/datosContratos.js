@@ -93,6 +93,16 @@ function buscarCol(row, ...nombres) {
 }
 
 /* ---------- Parseo de la planilla "Contratos a vencer" (la base) ---------- */
+function diasHasta(fechaISO) {
+  const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
+  const d = new Date(fechaISO + "T00:00:00");
+  return Math.round((d - hoy) / 86400000);
+}
+
+// Filtramos aca, no despues: la app solo muestra los que estan entre 91 y 150
+// dias, asi que no tiene sentido cargar (ni guardar) los miles de contratos
+// que vencen mas lejos o ya vencieron — eso es lo que hacia que la carga se
+// trabara con archivos grandes. Dejamos un colchon de +/-5 dias por las dudas.
 export function parsearContratos(filas) {
   const out = [];
   for (const row of filas) {
@@ -102,6 +112,8 @@ export function parsearContratos(filas) {
     const sede = normalizarSede(buscarCol(row, "sucursal contrato", "sucursal"));
     const fechaFin = fechaAISO(buscarCol(row, "fecha fin contrato", "fecha_fin_contrato"));
     if (!nombre || !sede || !fechaFin) continue;
+    const dias = diasHasta(fechaFin);
+    if (dias < 86 || dias > 155) continue;
     out.push({
       dni, nombre, sede,
       tipo_socio_n1: buscarCol(row, "tipo_socio_n1") || null,
@@ -197,17 +209,29 @@ export function combinarPlanillas(contratosParsed, accesosParsed, npsParsed) {
   };
 }
 
-export async function guardarSeguimientoMes(filas, { nombre, cargo, creadoPor }) {
+export async function guardarSeguimientoMes(filas, { nombre, cargo, creadoPor }, onProgreso) {
   const mesCarga = hoyYYYYMM();
   const filasFinal = filas.map((r) => ({
     ...r, mes_carga: mesCarga, subido_por: nombre, cargo_subido_por: cargo, creado_por: creadoPor,
   }));
-  // Insertamos en lotes para no mandar miles de filas en un solo pedido.
-  const LOTE = 500;
+  const LOTE = 150;
+  const totalLotes = Math.ceil(filasFinal.length / LOTE) || 1;
   for (let i = 0; i < filasFinal.length; i += LOTE) {
     const parte = filasFinal.slice(i, i + LOTE);
-    const { error } = await supabase.from("seguimiento_contratos").upsert(parte, { onConflict: "dni,mes_carga" });
-    if (error) throw error;
+    const numLote = Math.floor(i / LOTE) + 1;
+    if (onProgreso) onProgreso(numLote, totalLotes);
+    let intentos = 0;
+    while (true) {
+      try {
+        const { error } = await supabase.from("seguimiento_contratos").upsert(parte, { onConflict: "dni,mes_carga" });
+        if (error) throw error;
+        break;
+      } catch (err) {
+        intentos++;
+        if (intentos >= 2) throw new Error(`Se cortó en el lote ${numLote} de ${totalLotes} (${err.message || err}). Ya se guardaron los anteriores — probá subir de nuevo, los que ya están se van a actualizar sin duplicarse.`);
+        await new Promise((res) => setTimeout(res, 1200));
+      }
+    }
   }
   return filasFinal.length;
 }

@@ -146,8 +146,8 @@ export default function ContratosVencer({ perfil }) {
       const filas = await leerArchivo(file);
       if (tipo === "contratos") {
         const parsed = parsearContratos(filas);
-        if (!parsed.length) { setResultadoCarga({ tipo: "err", txt: "No encontré filas válidas en el archivo de Contratos a vencer. Revisá que sea el correcto." }); }
-        else setPendContratos({ nombreArchivo: file.name, filas: parsed });
+        if (!parsed.length) { setResultadoCarga({ tipo: "err", txt: `No encontré socios dentro de la ventana de seguimiento (91-150 días) en este archivo (tenía ${filas.length} filas en total). Puede ser normal si ninguno cae justo en esa ventana hoy.` }); }
+        else setPendContratos({ nombreArchivo: file.name, filas: parsed, totalOriginal: filas.length });
       } else if (tipo === "accesos") {
         const parsed = parsearAccesos(filas);
         setPendAccesos({ nombreArchivo: file.name, filas: parsed });
@@ -172,17 +172,24 @@ export default function ContratosVencer({ perfil }) {
     setPendContratos(null); setPendAccesos(null); setPendNPS(null);
   }
 
+  const [progreso, setProgreso] = useState(null);
+
   async function confirmarCargaMes() {
     if (!combinado) return;
     setGuardando(true);
+    setProgreso(null);
     try {
-      const n = await guardarSeguimientoMes(combinado.filas, { nombre: perfil.nombre, cargo: cargoLabel, creadoPor: perfil.id });
+      const n = await guardarSeguimientoMes(
+        combinado.filas, { nombre: perfil.nombre, cargo: cargoLabel, creadoPor: perfil.id },
+        (lote, total) => setProgreso({ lote, total })
+      );
       setResultadoCarga({ tipo: "ok", txt: `Listo: ${n} socios guardados para este mes (${combinado.matchAccesos} con datos de asistencia, ${combinado.matchNPS} con NPS).` });
       limpiarPendientes();
     } catch (err) {
       setResultadoCarga({ tipo: "err", txt: "No se pudo guardar: " + err.message });
     } finally {
       setGuardando(false);
+      setProgreso(null);
     }
   }
 
@@ -253,7 +260,7 @@ export default function ContratosVencer({ perfil }) {
                   </label>
                   {pendContratos && (
                     <div style={{ marginTop: 8, fontSize: 11, color: T.green, display: "flex", alignItems: "center", gap: 5 }}>
-                      <IconoCheckCirculo tam={13} /> {pendContratos.nombreArchivo} · {pendContratos.filas.length} filas
+                      <IconoCheckCirculo tam={13} /> {pendContratos.nombreArchivo} · {pendContratos.filas.length} en ventana (de {pendContratos.totalOriginal} en el archivo)
                     </div>
                   )}
                 </div>
@@ -289,7 +296,7 @@ export default function ContratosVencer({ perfil }) {
                 <div style={{ marginTop: 18, background: T.surface2, borderRadius: 11, padding: 16 }}>
                   <p style={{ fontSize: 12.5, fontWeight: 700, marginBottom: 8 }}>Vista previa del cruce</p>
                   <p style={{ fontSize: 12, color: T.inkSoft, marginBottom: 4 }}>
-                    Base de <b style={{ color: T.ink }}>{combinado.totalContratos}</b> socios (Contratos a vencer).
+                    Base de <b style={{ color: T.ink }}>{combinado.totalContratos}</b> socios dentro de la ventana de 91-150 días (ya filtrado).
                   </p>
                   <p style={{ fontSize: 12, color: T.inkSoft, marginBottom: 4 }}>
                     {pendAccesos
@@ -303,7 +310,7 @@ export default function ContratosVencer({ perfil }) {
                   </p>
                   <div style={{ display: "flex", gap: 8 }}>
                     <button style={btnVerde} disabled={guardando} onClick={confirmarCargaMes}>
-                      {guardando ? "Guardando..." : "Confirmar carga del mes"}
+                      {guardando ? (progreso ? `Guardando... (${progreso.lote}/${progreso.total})` : "Guardando...") : "Confirmar carga del mes"}
                     </button>
                     <button style={btnOut} disabled={guardando} onClick={limpiarPendientes}>Cancelar</button>
                   </div>
