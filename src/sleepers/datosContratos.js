@@ -216,6 +216,7 @@ export async function guardarSeguimientoMes(filas, { nombre, cargo, creadoPor },
   }));
   const LOTE = 150;
   const totalLotes = Math.ceil(filasFinal.length / LOTE) || 1;
+  const espera = (ms) => new Promise((res) => setTimeout(res, ms));
   for (let i = 0; i < filasFinal.length; i += LOTE) {
     const parte = filasFinal.slice(i, i + LOTE);
     const numLote = Math.floor(i / LOTE) + 1;
@@ -228,10 +229,12 @@ export async function guardarSeguimientoMes(filas, { nombre, cargo, creadoPor },
         break;
       } catch (err) {
         intentos++;
-        if (intentos >= 2) throw new Error(`Se cortó en el lote ${numLote} de ${totalLotes} (${err.message || err}). Ya se guardaron los anteriores — probá subir de nuevo, los que ya están se van a actualizar sin duplicarse.`);
-        await new Promise((res) => setTimeout(res, 1200));
+        if (intentos >= 4) throw new Error(`Se cortó en el lote ${numLote} de ${totalLotes} (${err.message || err}). Ya se guardaron los anteriores — probá subir de nuevo, los que ya están se van a actualizar sin duplicarse.`);
+        await espera(1000 * intentos); // 1s, 2s, 3s entre reintentos
       }
     }
+    // Pausa corta entre lotes para no saturar la conexión con pedidos seguidos.
+    if (i + LOTE < filasFinal.length) await espera(350);
   }
   return filasFinal.length;
 }
