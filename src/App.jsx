@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { T, FUENTE } from "./estilos.jsx";
+import { T, FUENTE, Logo } from "./estilos.jsx";
 import { useSesion, Auth, Pendiente, Equipo, Actividad, ROL_LABEL } from "./Acceso.jsx";
 import Sleepers from "./sleepers/Sleepers.jsx";
 import Administrador from "./sleepers/Administrador.jsx";
@@ -22,8 +22,7 @@ export default function App() {
   if (sesion === undefined || (sesion && cargando && !perfil)) {
     return (
       <div style={{ minHeight: "100vh", background: T.negro, color: T.ink, display: "flex",
-        alignItems: "center", justifyContent: "center", fontFamily: FUENTE, fontWeight: 800,
-        fontSize: 28, letterSpacing: ".1em" }}>{TITULO}</div>
+        alignItems: "center", justifyContent: "center", fontFamily: FUENTE }}><Logo size={28} /></div>
     );
   }
 
@@ -54,7 +53,7 @@ export default function App() {
       <header style={{ background: T.negro, borderBottom: "1px solid " + T.line, padding: "15px 24px" }}>
         <div style={{ maxWidth: ["sleepers","administrador","panorama","contratos"].includes(solapaActual) ? 1900 : 1000, margin: "0 auto", display: "flex", alignItems: "center",
           justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
-          <div style={{ fontWeight: 800, fontSize: 24, letterSpacing: ".1em" }}>{TITULO}</div>
+          <Logo size={22} />
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <div style={{ textAlign: "right", lineHeight: 1.35 }}>
               <div style={{ fontSize: 13, fontWeight: 700 }}>{perfil.nombre}</div>

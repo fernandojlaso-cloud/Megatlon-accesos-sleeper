@@ -146,8 +146,8 @@ export default function ContratosVencer({ perfil }) {
       const filas = await leerArchivo(file);
       if (tipo === "contratos") {
         const parsed = parsearContratos(filas);
-        if (!parsed.length) { setResultadoCarga({ tipo: "err", txt: `No encontré socios dentro de la ventana de seguimiento (91-150 días) en este archivo (tenía ${filas.length} filas en total). Puede ser normal si ninguno cae justo en esa ventana hoy.` }); }
-        else setPendContratos({ nombreArchivo: file.name, filas: parsed, totalOriginal: filas.length });
+        if (!parsed.length) { setResultadoCarga({ tipo: "err", txt: "No encontré filas válidas en el archivo de Contratos a vencer. Revisá que sea el correcto." }); }
+        else setPendContratos({ nombreArchivo: file.name, filas: parsed, totalOriginal: filas.length, sinDni: parsed.sinDni || 0 });
       } else if (tipo === "accesos") {
         const parsed = parsearAccesos(filas);
         setPendAccesos({ nombreArchivo: file.name, filas: parsed });
@@ -260,7 +260,7 @@ export default function ContratosVencer({ perfil }) {
                   </label>
                   {pendContratos && (
                     <div style={{ marginTop: 8, fontSize: 11, color: T.green, display: "flex", alignItems: "center", gap: 5 }}>
-                      <IconoCheckCirculo tam={13} /> {pendContratos.nombreArchivo} · {pendContratos.filas.length} en ventana (de {pendContratos.totalOriginal} en el archivo)
+                      <IconoCheckCirculo tam={13} /> {pendContratos.nombreArchivo} · {pendContratos.filas.length} filas{pendContratos.sinDni > 0 ? ` · ${pendContratos.sinDni} descartadas sin DNI` : ""}
                     </div>
                   )}
                 </div>
@@ -296,7 +296,10 @@ export default function ContratosVencer({ perfil }) {
                 <div style={{ marginTop: 18, background: T.surface2, borderRadius: 11, padding: 16 }}>
                   <p style={{ fontSize: 12.5, fontWeight: 700, marginBottom: 8 }}>Vista previa del cruce</p>
                   <p style={{ fontSize: 12, color: T.inkSoft, marginBottom: 4 }}>
-                    Base de <b style={{ color: T.ink }}>{combinado.totalContratos}</b> socios dentro de la ventana de 91-150 días (ya filtrado).
+                    Base de <b style={{ color: T.ink }}>{combinado.totalContratos}</b> socios (Contratos a vencer).
+                    {pendContratos.filas.filter((f) => f.estado === "Cerrado").length > 0 && (
+                      <> De esos, <b style={{ color: T.amber }}>{pendContratos.filas.filter((f) => f.estado === "Cerrado").length}</b> no tenían sede en la planilla — se cargan igual pero ya quedan dados de baja.</>
+                    )}
                   </p>
                   <p style={{ fontSize: 12, color: T.inkSoft, marginBottom: 4 }}>
                     {pendAccesos
@@ -368,7 +371,12 @@ export default function ContratosVencer({ perfil }) {
 
       {filtrados.length === 0 ? (
         <div style={{ padding: 50, textAlign: "center", color: T.inkSoft, background: T.surface, border: "1px solid " + T.line, borderRadius: 16 }}>
-          {enVentana.length ? "No hay socios que coincidan con el filtro actual." : "Todavía no hay socios en la ventana de 91 a 150 días. Cargá la planilla de Contratos a vencer arriba."}
+          <div>{enVentana.length ? "No hay socios que coincidan con el filtro actual." : "No hay socios dentro de la ventana de 91 a 150 días."}</div>
+          <div style={{ fontSize: 11.5, marginTop: 10, color: crudos.length ? T.green : T.inkSoft }}>
+            {crudos.length
+              ? `Hay ${crudos.length} socio(s) guardado(s) en total en la base (contando todos los meses cargados y fuera de esta ventana) — el filtro de fecha es lo que los está ocultando acá, no faltan datos.`
+              : "No hay ningún registro guardado todavía en esta base. Cargá la planilla de Contratos a vencer arriba."}
+          </div>
         </div>
       ) : (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(340px,1fr))", gap: 16 }}>

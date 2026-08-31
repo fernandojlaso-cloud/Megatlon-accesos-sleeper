@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "./supabase.js";
-import { T, FUENTE, inp, lab, btnMarca, btnOut, btnVerde, Badge } from "./estilos.jsx";
+import { T, FUENTE, inp, lab, btnMarca, btnOut, btnVerde, Badge, Logo } from "./estilos.jsx";
 
 /* ============================================================
    CONFIGURACION
@@ -113,7 +113,7 @@ export function Auth({ titulo = "Sistema", subtitulo = "" }) {
     <div style={{ minHeight: "100vh", background: T.negro, display: "flex", alignItems: "center", justifyContent: "center", padding: 20, fontFamily: FUENTE, color: T.ink }}>
       <div style={{ width: "100%", maxWidth: 420 }}>
         <div style={{ textAlign: "center", marginBottom: 24 }}>
-          <div style={{ fontWeight: 800, fontSize: 38, letterSpacing: ".1em" }}>{titulo}</div>
+          <Logo size={34} />
           {subtitulo && <div style={{ color: T.inkSoft, fontSize: 12.5, marginTop: 9 }}>{subtitulo}</div>}
         </div>
         <div style={{ background: T.surface, border: "1px solid " + T.line, borderRadius: 18, padding: 24 }}>
@@ -197,7 +197,7 @@ export function Pendiente({ perfil, onSalir, titulo = "Sistema" }) {
   return (
     <div style={{ minHeight: "100vh", background: T.negro, display: "flex", alignItems: "center", justifyContent: "center", padding: 20, fontFamily: FUENTE, color: T.ink }}>
       <div style={{ background: T.surface, border: "1px solid " + T.line, borderRadius: 18, padding: 30, maxWidth: 450, textAlign: "center" }}>
-        <div style={{ fontWeight: 800, fontSize: 28, letterSpacing: ".1em" }}>{titulo}</div>
+        <Logo size={26} />
         <div style={{ fontSize: 17, fontWeight: 700, margin: "18px 0 8px" }}>
           {rechazado ? "Tu solicitud fue rechazada"
             : inactivo ? "Tu acceso fue dado de baja"

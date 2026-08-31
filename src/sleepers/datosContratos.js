@@ -93,35 +93,33 @@ function buscarCol(row, ...nombres) {
 }
 
 /* ---------- Parseo de la planilla "Contratos a vencer" (la base) ---------- */
-function diasHasta(fechaISO) {
-  const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
-  const d = new Date(fechaISO + "T00:00:00");
-  return Math.round((d - hoy) / 86400000);
-}
-
-// Filtramos aca, no despues: la app solo muestra los que estan entre 91 y 150
-// dias, asi que no tiene sentido cargar (ni guardar) los miles de contratos
-// que vencen mas lejos o ya vencieron — eso es lo que hacia que la carga se
-// trabara con archivos grandes. Dejamos un colchon de +/-5 dias por las dudas.
+// Se sube TODO el archivo de Contratos, sin filtrar por dias — el filtro de
+// 91-150 dias solo se aplica en pantalla (ver "enVentana" en ContratosVencer.jsx),
+// no en lo que se guarda. Asi el historial queda completo para consultarlo mas
+// adelante aunque hoy no aparezca en el listado principal.
 export function parsearContratos(filas) {
   const out = [];
+  let sinDni = 0;
   for (const row of filas) {
     const dni = soloDigitos(buscarCol(row, "numero_doc", "numerodoc", "dni", "documento"));
-    if (!dni) continue; // salta filas de encabezado/filtro sin DNI valido
+    if (!dni) { sinDni++; continue; } // sin DNI no hay forma de identificar/cruzar al socio, se descarta
     const nombre = [buscarCol(row, "nombre"), buscarCol(row, "apellido")].filter(Boolean).join(" ").trim();
-    const sede = normalizarSede(buscarCol(row, "sucursal contrato", "sucursal"));
+    const sedeOriginal = normalizarSede(buscarCol(row, "sucursal contrato", "sucursal"));
     const fechaFin = fechaAISO(buscarCol(row, "fecha fin contrato", "fecha_fin_contrato"));
-    if (!nombre || !sede || !fechaFin) continue;
-    const dias = diasHasta(fechaFin);
-    if (dias < 86 || dias > 155) continue;
+    if (!nombre || !fechaFin) continue;
+    const sinSede = !sedeOriginal;
     out.push({
-      dni, nombre, sede,
+      dni, nombre, sede: sedeOriginal || "Sin sede",
+      // Sin sede no se puede asignar a ningun equipo para trabajarlo: se carga
+      // igual (no desaparece de la planilla) pero directamente dado de baja.
+      estado: sinSede ? "Cerrado" : "Abierto",
       tipo_socio_n1: buscarCol(row, "tipo_socio_n1") || null,
       tipo_socio_n2: buscarCol(row, "tipo_socio_n2") || null,
       lista_precio: buscarCol(row, "lista precio", "lista_precio") || null,
       fecha_fin_contrato: fechaFin,
     });
   }
+  out.sinDni = sinDni;
   return out;
 }
 

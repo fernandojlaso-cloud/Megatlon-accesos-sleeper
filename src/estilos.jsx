@@ -57,3 +57,12 @@ export function Badge({ children, tone = "green" }) {
       padding: "4px 9px", borderRadius: 7, whiteSpace: "nowrap" }}>{children}</span>
   );
 }
+
+export function Logo({ size = 24 }) {
+  return (
+    <span style={{ fontWeight: 800, letterSpacing: ".08em", fontSize: size, whiteSpace: "nowrap" }}>
+      <span style={{ color: T.marca }}>SLEEPER</span>{" "}
+      <span style={{ color: T.ink }}>MEGATLON</span>
+    </span>
+  );
+}
