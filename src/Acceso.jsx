@@ -11,9 +11,9 @@ import { T, FUENTE, inp, lab, btnMarca, btnOut, btnVerde, Badge } from "./estilo
 export const DOMINIO = "megatlon.com.ar";
 
 export const SEDES = [
-  "Alcorta", "Almagro", "Ateneo", "Barracas", "Barrio Norte", "Belgrano",
+  "Alcorta", "Almagro", "Alto Rosario", "Ateneo", "Barracas", "Barrio Norte", "Belgrano",
   "Caballito", "Center", "Devoto", "Distrito Arcos", "Distrito Tecnológico",
-  "Floresta", "La Imprenta", "Nuñez", "Puerto Madero", "Recoleta",
+  "Floresta", "La Imprenta", "Nuñez", "Puerto Madero", "Recoleta", "Rosario", "SEC",
   "Villa Crespo", "Gonnet", "Martinez", "Martinez 2", "Olivos", "Pilar",
   "Racing Club",
 ];
