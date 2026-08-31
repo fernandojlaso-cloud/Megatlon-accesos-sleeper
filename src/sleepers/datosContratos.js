@@ -272,8 +272,17 @@ const MATRIZ_SALUD = {
 export function clasificar(r) {
   const segmento = segmentoNPS(r.nps_score);
   const nivel = nivelAsistencia(r.asistencias_2m);
-  if (!segmento || !nivel) return { segmento, nivel, score: null, completo: false };
-  return { segmento, nivel, score: MATRIZ_SALUD[`${nivel}|${segmento}`], completo: true };
+  if (segmento && nivel) {
+    return { segmento, nivel, score: MATRIZ_SALUD[`${nivel}|${segmento}`], completo: true };
+  }
+  // Sin respuesta de NPS: nos regimos solo por la asistencia, con otros cortes
+  // (distintos de los de la matriz, que son 1-9 critico / 10-28 atencion / 29+ saludable).
+  if (!segmento && r.asistencias_2m !== null && r.asistencias_2m !== undefined) {
+    const a = r.asistencias_2m;
+    const score = a <= 9 ? 1 : a <= 28 ? 4 : 7;
+    return { segmento: null, nivel: null, score, completo: true, soloAsistencia: true };
+  }
+  return { segmento, nivel, score: null, completo: false };
 }
 
 /* ============================================================

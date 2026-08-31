@@ -136,14 +136,14 @@ export default function ContratosVencer({ perfil }) {
   }), [enVentana, filtroSede, filtroEstado, filtroClasif, busqueda, filtroAsistDesde, filtroAsistHasta, filtroNpsDesde, filtroNpsHasta]);
 
   const stats = useMemo(() => {
-    const base = enVentana.filter((r) => !filtroSede || r.sede === filtroSede);
+    const base = filtrados;
     const critico = base.filter((r) => r._clasif.completo && r._clasif.score <= 2).length;
     const atencion = base.filter((r) => r._clasif.completo && r._clasif.score >= 3 && r._clasif.score <= 5).length;
     const saludable = base.filter((r) => r._clasif.completo && r._clasif.score >= 6).length;
     const incompleto = base.filter((r) => !r._clasif.completo).length;
     const cerrados = base.filter((r) => r.estado === "Cerrado").length;
     return { total: base.length, critico, atencion, saludable, incompleto, cerrados };
-  }, [enVentana, filtroSede]);
+  }, [filtrados]);
 
   async function elegirArchivo(ref, tipo) {
     const file = ref.current.files[0];
@@ -417,6 +417,8 @@ export default function ContratosVencer({ perfil }) {
             const c = r._clasif;
             const nota = c.forzadoPorFaltaDatos
               ? "Vence en menos de 120 días y falta asistencia o NPS — se marca crítico por falta de datos, no por mal puntaje. Priorizá conseguir esa información."
+              : c.soloAsistencia
+              ? "No respondió la encuesta de NPS — clasificado solo por asistencia (1-9 crítico, 10-28 atención, 29+ saludable)."
               : (c.completo ? notaEspecial(c.nivel, c.segmento) : null);
             const hasPhone = r.telefono && r.telefono.length > 5;
             const hasEmail = r.email && r.email.includes("@");
