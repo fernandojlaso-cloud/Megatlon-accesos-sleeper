@@ -1,7 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
 import { T, FUENTE, Badge } from "../estilos.jsx";
 import { useCasos } from "./datos.js";
+import { useSeguimientoContratos, clasificar } from "./datosContratos.js";
 import { supabase } from "../supabase.js";
+
+const hoyStr = () => new Date().toISOString().slice(0, 10);
+const diasEntre = (desde, hasta) => {
+  if (!desde) return 0;
+  const d1 = new Date(desde + "T00:00:00");
+  const d2 = new Date((hasta || hoyStr()) + "T00:00:00");
+  return Math.round((d2 - d1) / 86400000);
+};
 
 /* ============================================================
    Solapa "Panorama" — exclusiva del rol Supervisor.
@@ -59,6 +68,40 @@ export default function Supervisor() {
     return { total: casos.length, sinGestionar, gestionado, cerrado };
   }, [casos, comentariosCount]);
 
+  // ---------- Contratos a vencer ----------
+  const { registros: registrosContratos } = useSeguimientoContratos();
+  const contratosEnVentana = useMemo(() => registrosContratos.map((r) => ({ ...r, _clasif: clasificar(r) }))
+    .filter((r) => { const d = diasEntre(hoyStr(), r.fecha_fin_contrato); return d >= 91 && d <= 150; }),
+    [registrosContratos]);
+
+  const macroContratos = useMemo(() => {
+    const critico = contratosEnVentana.filter((r) => r._clasif.completo && r._clasif.score <= 2).length;
+    const atencion = contratosEnVentana.filter((r) => r._clasif.completo && r._clasif.score >= 3 && r._clasif.score <= 5).length;
+    const saludable = contratosEnVentana.filter((r) => r._clasif.completo && r._clasif.score >= 6).length;
+    const incompleto = contratosEnVentana.filter((r) => !r._clasif.completo).length;
+    const abiertos = contratosEnVentana.filter((r) => r.estado === "Abierto").length;
+    const cerrados = contratosEnVentana.filter((r) => r.estado === "Cerrado").length;
+    return { total: contratosEnVentana.length, critico, atencion, saludable, incompleto, abiertos, cerrados };
+  }, [contratosEnVentana]);
+
+  const contratosPorSede = useMemo(() => {
+    const sedes = [...new Set(contratosEnVentana.map((r) => r.sede).filter(Boolean))].sort();
+    return sedes.map((sede) => {
+      const lista = contratosEnVentana.filter((r) => r.sede === sede);
+      const critico = lista.filter((r) => r._clasif.completo && r._clasif.score <= 2).length;
+      const atencion = lista.filter((r) => r._clasif.completo && r._clasif.score >= 3 && r._clasif.score <= 5).length;
+      const saludable = lista.filter((r) => r._clasif.completo && r._clasif.score >= 6).length;
+      const incompleto = lista.filter((r) => !r._clasif.completo).length;
+      const cerrados = lista.filter((r) => r.estado === "Cerrado").length;
+      const total = lista.length;
+      return {
+        sede, total, critico, atencion, saludable, incompleto, cerrados,
+        pctCritico: total ? Math.round((critico / total) * 100) : 0,
+        pctCerrado: total ? Math.round((cerrados / total) * 100) : 0,
+      };
+    });
+  }, [contratosEnVentana]);
+
   return (
     <div>
       <div style={{ fontSize: 15, fontWeight: 800, textTransform: "uppercase", letterSpacing: "-.01em", marginBottom: 6 }}>Panorama general</div>
@@ -114,6 +157,70 @@ export default function Supervisor() {
                 <td style={{ ...td, fontWeight: 700 }}>{macro.cerrado}</td>
                 <td style={{ ...td, fontWeight: 700 }}>{macro.total ? Math.round(((macro.gestionado + macro.cerrado) / macro.total) * 100) : 0}%</td>
                 <td style={{ ...td, fontWeight: 700 }}>{macro.total ? Math.round((macro.cerrado / macro.total) * 100) : 0}%</td>
+              </tr>
+            </tfoot>
+          )}
+        </table>
+      </div>
+
+      <p style={{ ...sectionTitle, marginTop: 34 }}>Contratos a vencer (ventana 91-150 días)</p>
+      <p style={{ fontSize: 11.5, color: T.inkSoft, marginTop: -6, marginBottom: 14 }}>La asistencia es de los últimos 2 meses. El NPS es histórico (última respuesta del socio, sin importar hace cuánto).</p>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))", gap: 14, marginBottom: 22 }}>
+        <Macro n={macroContratos.total} l="Total en ventana" color={T.marca} />
+        <Macro n={macroContratos.critico} l="Crítico" color={T.red} />
+        <Macro n={macroContratos.atencion} l="Atención" color={T.amber} />
+        <Macro n={macroContratos.saludable} l="Saludable" color={T.green} />
+        <Macro n={macroContratos.incompleto} l="Datos incompletos" color={T.line} />
+        <Macro n={macroContratos.abiertos} l="Abiertos" color={T.amber} />
+        <Macro n={macroContratos.cerrados} l="Cerrados" color={T.green} />
+      </div>
+
+      <p style={sectionTitle}>Contratos a vencer — por sucursal</p>
+      <div style={{ background: T.surface, border: "1px solid " + T.line, borderRadius: 16, overflowX: "auto" }}>
+        <table style={{ width: "100%", fontSize: 13, borderCollapse: "collapse" }}>
+          <thead>
+            <tr>
+              <th style={th}>Sucursal</th>
+              <th style={th}>Total</th>
+              <th style={th}>Crítico</th>
+              <th style={th}>Atención</th>
+              <th style={th}>Saludable</th>
+              <th style={th}>Incompletos</th>
+              <th style={th}>Cerrados</th>
+              <th style={th}>% crítico</th>
+              <th style={th}>% cerrado</th>
+            </tr>
+          </thead>
+          <tbody>
+            {contratosPorSede.length === 0 && (
+              <tr><td colSpan={9} style={{ padding: 40, textAlign: "center", color: T.inkSoft }}>Todavía no hay contratos en la ventana de 91-150 días.</td></tr>
+            )}
+            {contratosPorSede.map((s) => (
+              <tr key={s.sede}>
+                <td style={{ ...td, fontWeight: 600 }}>{s.sede}</td>
+                <td style={td}>{s.total}</td>
+                <td style={td}><Badge tone="red">{s.critico}</Badge></td>
+                <td style={td}><Badge tone="amber">{s.atencion}</Badge></td>
+                <td style={td}><Badge tone="green">{s.saludable}</Badge></td>
+                <td style={td}><Badge tone="gris">{s.incompleto}</Badge></td>
+                <td style={td}><Badge tone="green">{s.cerrados}</Badge></td>
+                <td style={td}>{s.pctCritico}%</td>
+                <td style={td}>{s.pctCerrado}%</td>
+              </tr>
+            ))}
+          </tbody>
+          {contratosPorSede.length > 0 && (
+            <tfoot>
+              <tr style={{ background: T.surface2 }}>
+                <td style={{ ...td, fontWeight: 700 }}>Total todas las sedes</td>
+                <td style={{ ...td, fontWeight: 700 }}>{macroContratos.total}</td>
+                <td style={{ ...td, fontWeight: 700 }}>{macroContratos.critico}</td>
+                <td style={{ ...td, fontWeight: 700 }}>{macroContratos.atencion}</td>
+                <td style={{ ...td, fontWeight: 700 }}>{macroContratos.saludable}</td>
+                <td style={{ ...td, fontWeight: 700 }}>{macroContratos.incompleto}</td>
+                <td style={{ ...td, fontWeight: 700 }}>{macroContratos.cerrados}</td>
+                <td style={{ ...td, fontWeight: 700 }}>{macroContratos.total ? Math.round((macroContratos.critico / macroContratos.total) * 100) : 0}%</td>
+                <td style={{ ...td, fontWeight: 700 }}>{macroContratos.total ? Math.round((macroContratos.cerrados / macroContratos.total) * 100) : 0}%</td>
               </tr>
             </tfoot>
           )}

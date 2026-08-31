@@ -99,6 +99,10 @@ export default function ContratosVencer({ perfil }) {
   const [filtroClasif, setFiltroClasif] = useState("");
   const [filtroEstado, setFiltroEstado] = useState("Abierto");
   const [busqueda, setBusqueda] = useState("");
+  const [filtroAsistDesde, setFiltroAsistDesde] = useState("");
+  const [filtroAsistHasta, setFiltroAsistHasta] = useState("");
+  const [filtroNpsDesde, setFiltroNpsDesde] = useState("");
+  const [filtroNpsHasta, setFiltroNpsHasta] = useState("");
   const [modalComentarios, setModalComentarios] = useState(null);
   const [nuevoComentario, setNuevoComentario] = useState("");
   const [modalMensaje, setModalMensaje] = useState(null);
@@ -122,10 +126,14 @@ export default function ContratosVencer({ perfil }) {
       if (filtroClasif === "atencion" && !(s.completo && s.score >= 3 && s.score <= 5)) return false;
       if (filtroClasif === "saludable" && !(s.completo && s.score >= 6)) return false;
     }
+    if (filtroAsistDesde !== "" && (r.asistencias_2m === null || r.asistencias_2m === undefined || r.asistencias_2m < Number(filtroAsistDesde))) return false;
+    if (filtroAsistHasta !== "" && (r.asistencias_2m === null || r.asistencias_2m === undefined || r.asistencias_2m > Number(filtroAsistHasta))) return false;
+    if (filtroNpsDesde !== "" && (r.nps_score === null || r.nps_score === undefined || r.nps_score < Number(filtroNpsDesde))) return false;
+    if (filtroNpsHasta !== "" && (r.nps_score === null || r.nps_score === undefined || r.nps_score > Number(filtroNpsHasta))) return false;
     const b = norm(busqueda);
     if (b && !(norm(r.nombre).includes(b) || norm(r.dni).includes(b))) return false;
     return true;
-  }), [enVentana, filtroSede, filtroEstado, filtroClasif, busqueda]);
+  }), [enVentana, filtroSede, filtroEstado, filtroClasif, busqueda, filtroAsistDesde, filtroAsistHasta, filtroNpsDesde, filtroNpsHasta]);
 
   const stats = useMemo(() => {
     const base = enVentana.filter((r) => !filtroSede || r.sede === filtroSede);
@@ -231,6 +239,7 @@ export default function ContratosVencer({ perfil }) {
       <div style={{ marginBottom: 18 }}>
         <div style={{ fontSize: 13, textTransform: "uppercase", fontWeight: 800, letterSpacing: "-.01em", color: T.inkSoft }}>Seguimiento de contratos a vencer</div>
         <p style={{ fontSize: 12, color: T.inkSoft, marginTop: 4 }}>Socios activos cuyo contrato vence entre 91 y 150 días desde hoy, cruzando Contratos + Accesos + NPS por DNI.</p>
+        <p style={{ fontSize: 11.5, color: T.inkSoft, marginTop: 4 }}>La <b style={{ color: T.ink }}>asistencia</b> es de los últimos 2 meses. El <b style={{ color: T.ink }}>NPS</b> es histórico (la última respuesta que dio el socio, sin importar hace cuánto).</p>
       </div>
 
       {puedeCargar && (
@@ -358,6 +367,29 @@ export default function ContratosVencer({ perfil }) {
           <label style={lab}>Buscar</label>
           <input style={inp} value={busqueda} onChange={(e) => setBusqueda(e.target.value)} placeholder="Nombre o DNI..." />
         </div>
+      </div>
+      <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "flex-end", marginBottom: 16 }}>
+        <div style={{ minWidth: 110 }}>
+          <label style={lab}>Asistencias desde</label>
+          <input type="number" min="0" style={inp} value={filtroAsistDesde} onChange={(e) => setFiltroAsistDesde(e.target.value)} placeholder="Mín." />
+        </div>
+        <div style={{ minWidth: 110 }}>
+          <label style={lab}>Asistencias hasta</label>
+          <input type="number" min="0" style={inp} value={filtroAsistHasta} onChange={(e) => setFiltroAsistHasta(e.target.value)} placeholder="Máx." />
+        </div>
+        <div style={{ minWidth: 100 }}>
+          <label style={lab}>NPS desde</label>
+          <input type="number" min="0" max="10" style={inp} value={filtroNpsDesde} onChange={(e) => setFiltroNpsDesde(e.target.value)} placeholder="Mín." />
+        </div>
+        <div style={{ minWidth: 100 }}>
+          <label style={lab}>NPS hasta</label>
+          <input type="number" min="0" max="10" style={inp} value={filtroNpsHasta} onChange={(e) => setFiltroNpsHasta(e.target.value)} placeholder="Máx." />
+        </div>
+        {(filtroAsistDesde !== "" || filtroAsistHasta !== "" || filtroNpsDesde !== "" || filtroNpsHasta !== "") && (
+          <button style={btnOut} onClick={() => { setFiltroAsistDesde(""); setFiltroAsistHasta(""); setFiltroNpsDesde(""); setFiltroNpsHasta(""); }}>
+            <IconoX /> Limpiar asistencia/NPS
+          </button>
+        )}
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(140px,1fr))", gap: 12, marginBottom: 26 }}>
