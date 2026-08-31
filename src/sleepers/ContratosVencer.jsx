@@ -64,7 +64,19 @@ function leerArchivo(file) {
 
 export default function ContratosVencer({ perfil }) {
   const { registros: crudos, comentariosPorRegistro, recargarComentarios } = useSeguimientoContratos();
-  const registros = useMemo(() => crudos.map((r) => ({ ...r, _clasif: clasificar(r), _numComentarios: (comentariosPorRegistro[r.id] || []).length })), [crudos, comentariosPorRegistro]);
+  const registros = useMemo(() => crudos.map((r) => {
+    let clasif = clasificar(r);
+    const dias = diasEntre(hoyStr(), r.fecha_fin_contrato);
+    const faltaAccesos = r.asistencias_2m === null || r.asistencias_2m === undefined;
+    const faltaNPS = r.nps_score === null || r.nps_score === undefined;
+    // Entre 91 y 120 dias, si falta asistencia o NPS, no lo dejamos como
+    // "incompleto": pasa a critico, porque estar tan cerca del vencimiento
+    // sin esos datos es en si mismo una señal de riesgo.
+    if (!clasif.completo && dias >= 91 && dias <= 120 && (faltaAccesos || faltaNPS)) {
+      clasif = { ...clasif, score: 1, completo: true, forzadoPorFaltaDatos: true };
+    }
+    return { ...r, _clasif: clasif, _numComentarios: (comentariosPorRegistro[r.id] || []).length };
+  }), [crudos, comentariosPorRegistro]);
 
   const cargoLabel = {
     director: "Director", gerente: "Gerente",
@@ -356,7 +368,9 @@ export default function ContratosVencer({ perfil }) {
           {filtrados.map((r) => {
             const dias = diasEntre(hoyStr(), r.fecha_fin_contrato);
             const c = r._clasif;
-            const nota = c.completo ? notaEspecial(c.nivel, c.segmento) : null;
+            const nota = c.forzadoPorFaltaDatos
+              ? "Vence en menos de 120 días y falta asistencia o NPS — se marca crítico por falta de datos, no por mal puntaje. Priorizá conseguir esa información."
+              : (c.completo ? notaEspecial(c.nivel, c.segmento) : null);
             const hasPhone = r.telefono && r.telefono.length > 5;
             const hasEmail = r.email && r.email.includes("@");
             const mensaje = mensajeDe(r);
