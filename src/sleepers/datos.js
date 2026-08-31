@@ -12,11 +12,23 @@ export function useCasos() {
   const [cargando, setCargando] = useState(true);
 
   const recargar = useCallback(async () => {
-    const { data, error } = await supabase
-      .from("casos")
-      .select("*")
-      .order("creado_en", { ascending: false });
-    if (!error) setCasos(data || []);
+    // Supabase/PostgREST devuelve como maximo 1000 filas por pedido salvo que
+    // se pida explicitamente con .range(): paginamos hasta traer todo.
+    const TAM_PAGINA = 1000;
+    let desde = 0;
+    let todos = [];
+    while (true) {
+      const { data, error } = await supabase
+        .from("casos")
+        .select("*")
+        .order("creado_en", { ascending: false })
+        .range(desde, desde + TAM_PAGINA - 1);
+      if (error) { console.error(error); break; }
+      todos = todos.concat(data || []);
+      if (!data || data.length < TAM_PAGINA) break;
+      desde += TAM_PAGINA;
+    }
+    setCasos(todos);
     setCargando(false);
   }, []);
 

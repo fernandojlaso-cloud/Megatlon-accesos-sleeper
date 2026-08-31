@@ -10,11 +10,23 @@ export function useSeguimientoContratos() {
   const [comentariosPorRegistro, setComentariosPorRegistro] = useState({});
 
   const recargar = useCallback(async () => {
-    const { data, error } = await supabase
-      .from("seguimiento_contratos")
-      .select("*")
-      .order("fecha_fin_contrato", { ascending: true });
-    if (!error) setRegistros(data || []);
+    // Supabase/PostgREST devuelve como maximo 1000 filas por pedido salvo que
+    // se pida explicitamente con .range(): paginamos hasta traer todo.
+    const TAM_PAGINA = 1000;
+    let desde = 0;
+    let todos = [];
+    while (true) {
+      const { data, error } = await supabase
+        .from("seguimiento_contratos")
+        .select("*")
+        .order("fecha_fin_contrato", { ascending: true })
+        .range(desde, desde + TAM_PAGINA - 1);
+      if (error) { console.error(error); break; }
+      todos = todos.concat(data || []);
+      if (!data || data.length < TAM_PAGINA) break;
+      desde += TAM_PAGINA;
+    }
+    setRegistros(todos);
   }, []);
 
   const recargarComentarios = useCallback(async (registroId) => {
