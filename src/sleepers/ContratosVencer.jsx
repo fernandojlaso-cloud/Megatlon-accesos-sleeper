@@ -3,7 +3,7 @@ import * as XLSX from "xlsx";
 import { T, FUENTE, inp, lab, btnMarca, btnOut, btnVerde, Badge } from "../estilos.jsx";
 import {
   useSeguimientoContratos, actualizarRegistro, agregarComentarioRegistro,
-  parsearContratos, parsearAccesos, parsearNPS, cargarContratos, cargarAccesos, cargarNPS,
+  parsearContratos, parsearAccesos, parsearNPS, combinarPlanillas, guardarSeguimientoMes,
   clasificar, construirMensajeContrato, mensajeContratoSinFirma,
 } from "./datosContratos.js";
 import {
@@ -73,8 +73,12 @@ export default function ContratosVencer({ perfil }) {
   const puedeCargar = ["director", "gerente", "gerente_servicio", "coordinador_servicio", "referente_servicio"].includes(perfil.rol);
 
   const [boAbierto, setBoAbierto] = useState(false);
-  const [cargando, setCargando] = useState(null);
+  const [leyendo, setLeyendo] = useState(null);
+  const [guardando, setGuardando] = useState(false);
   const [resultadoCarga, setResultadoCarga] = useState(null);
+  const [pendContratos, setPendContratos] = useState(null); // {nombreArchivo, filas}
+  const [pendAccesos, setPendAccesos] = useState(null);
+  const [pendNPS, setPendNPS] = useState(null);
   const refContratos = useRef(null);
   const refAccesos = useRef(null);
   const refNPS = useRef(null);
@@ -121,34 +125,52 @@ export default function ContratosVencer({ perfil }) {
     return { total: base.length, critico, atencion, saludable, incompleto, cerrados };
   }, [enVentana, filtroSede]);
 
-  async function subir(ref, tipo) {
+  async function elegirArchivo(ref, tipo) {
     const file = ref.current.files[0];
     if (!file) return;
-    setCargando(tipo);
+    setLeyendo(tipo);
     setResultadoCarga(null);
     try {
       const filas = await leerArchivo(file);
       if (tipo === "contratos") {
         const parsed = parsearContratos(filas);
-        if (!parsed.length) { setResultadoCarga({ tipo: "err", txt: "No encontré filas válidas en el archivo de Contratos a vencer." }); }
-        else {
-          const n = await cargarContratos(parsed, { nombre: perfil.nombre, cargo: cargoLabel, creadoPor: perfil.id });
-          setResultadoCarga({ tipo: "ok", txt: `Contratos a vencer: ${n} socios cargados/actualizados para este mes.` });
-        }
+        if (!parsed.length) { setResultadoCarga({ tipo: "err", txt: "No encontré filas válidas en el archivo de Contratos a vencer. Revisá que sea el correcto." }); }
+        else setPendContratos({ nombreArchivo: file.name, filas: parsed });
       } else if (tipo === "accesos") {
         const parsed = parsearAccesos(filas);
-        const { coincidencias, total } = await cargarAccesos(parsed);
-        setResultadoCarga({ tipo: "ok", txt: `Accesos: ${coincidencias} de ${total} DNI coincidieron con la base de Contratos de este mes y se actualizaron. El resto se descartó (no está en la base de este mes).` });
+        setPendAccesos({ nombreArchivo: file.name, filas: parsed });
       } else if (tipo === "nps") {
         const parsed = parsearNPS(filas);
-        const { coincidencias, total } = await cargarNPS(parsed);
-        setResultadoCarga({ tipo: "ok", txt: `NPS: ${coincidencias} de ${total} DNI coincidieron con la base de Contratos de este mes y se actualizaron.` });
+        setPendNPS({ nombreArchivo: file.name, filas: parsed });
       }
     } catch (err) {
-      setResultadoCarga({ tipo: "err", txt: "No se pudo procesar el archivo: " + err.message });
+      setResultadoCarga({ tipo: "err", txt: "No se pudo leer el archivo: " + err.message });
     } finally {
-      setCargando(null);
+      setLeyendo(null);
       ref.current.value = "";
+    }
+  }
+
+  const combinado = useMemo(() => {
+    if (!pendContratos) return null;
+    return combinarPlanillas(pendContratos.filas, pendAccesos?.filas || [], pendNPS?.filas || []);
+  }, [pendContratos, pendAccesos, pendNPS]);
+
+  function limpiarPendientes() {
+    setPendContratos(null); setPendAccesos(null); setPendNPS(null);
+  }
+
+  async function confirmarCargaMes() {
+    if (!combinado) return;
+    setGuardando(true);
+    try {
+      const n = await guardarSeguimientoMes(combinado.filas, { nombre: perfil.nombre, cargo: cargoLabel, creadoPor: perfil.id });
+      setResultadoCarga({ tipo: "ok", txt: `Listo: ${n} socios guardados para este mes (${combinado.matchAccesos} con datos de asistencia, ${combinado.matchNPS} con NPS).` });
+      limpiarPendientes();
+    } catch (err) {
+      setResultadoCarga({ tipo: "err", txt: "No se pudo guardar: " + err.message });
+    } finally {
+      setGuardando(false);
     }
   }
 
@@ -205,35 +227,77 @@ export default function ContratosVencer({ perfil }) {
           {boAbierto && (
             <div style={{ border: "1px solid " + T.line, borderTop: "none", borderRadius: "0 0 16px 16px", padding: 20, background: T.surface }}>
               <p style={{ fontSize: 11.5, color: T.inkSoft, marginBottom: 16 }}>
-                Cargá primero <b style={{ color: T.ink }}>Contratos a vencer</b> (define la base de socios del mes). Después subí Accesos y NPS
-                para completar sus datos — los DNI que no estén en la base de Contratos de este mes se descartan solos.
+                Elegí las 3 planillas del mes (no hace falta un orden puntual). Se leen acá en tu navegador y te muestro
+                el cruce antes de guardar nada — recién al tocar "Confirmar carga del mes" se graba todo junto.
+                <b style={{ color: T.ink }}> Contratos a vencer es obligatoria</b> (define la base); Accesos y NPS son opcionales.
               </p>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(220px,1fr))", gap: 14 }}>
                 <div style={s.uploadCard}>
                   <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 4 }}>1 · Contratos a vencer</div>
                   <p style={{ fontSize: 11, color: T.inkSoft, marginBottom: 10 }}>Define la base del mes.</p>
                   <label style={{ ...btnMarca, display: "inline-flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 12.5 }}>
-                    <IconoSubir /> {cargando === "contratos" ? "Cargando..." : "Elegir archivo"}
-                    <input ref={refContratos} type="file" accept=".csv,.xlsx,.xls" onChange={() => subir(refContratos, "contratos")} style={{ display: "none" }} disabled={!!cargando} />
+                    <IconoSubir /> {leyendo === "contratos" ? "Leyendo..." : "Elegir archivo"}
+                    <input ref={refContratos} type="file" accept=".csv,.xlsx,.xls" onChange={() => elegirArchivo(refContratos, "contratos")} style={{ display: "none" }} disabled={!!leyendo || guardando} />
                   </label>
+                  {pendContratos && (
+                    <div style={{ marginTop: 8, fontSize: 11, color: T.green, display: "flex", alignItems: "center", gap: 5 }}>
+                      <IconoCheckCirculo tam={13} /> {pendContratos.nombreArchivo} · {pendContratos.filas.length} filas
+                    </div>
+                  )}
                 </div>
                 <div style={s.uploadCard}>
                   <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 4 }}>2 · Accesos por socio</div>
                   <p style={{ fontSize: 11, color: T.inkSoft, marginBottom: 10 }}>Asistencia de los últimos 2 meses.</p>
                   <label style={{ ...btnOut, display: "inline-flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 12.5 }}>
-                    <IconoSubir /> {cargando === "accesos" ? "Cargando..." : "Elegir archivo"}
-                    <input ref={refAccesos} type="file" accept=".csv,.xlsx,.xls" onChange={() => subir(refAccesos, "accesos")} style={{ display: "none" }} disabled={!!cargando} />
+                    <IconoSubir /> {leyendo === "accesos" ? "Leyendo..." : "Elegir archivo"}
+                    <input ref={refAccesos} type="file" accept=".csv,.xlsx,.xls" onChange={() => elegirArchivo(refAccesos, "accesos")} style={{ display: "none" }} disabled={!!leyendo || guardando} />
                   </label>
+                  {pendAccesos && (
+                    <div style={{ marginTop: 8, fontSize: 11, color: T.green, display: "flex", alignItems: "center", gap: 5 }}>
+                      <IconoCheckCirculo tam={13} /> {pendAccesos.nombreArchivo} · {pendAccesos.filas.length} filas
+                    </div>
+                  )}
                 </div>
                 <div style={s.uploadCard}>
                   <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 4 }}>3 · NPS y comentarios</div>
                   <p style={{ fontSize: 11, color: T.inkSoft, marginBottom: 10 }}>Última respuesta de cada socio.</p>
                   <label style={{ ...btnOut, display: "inline-flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 12.5 }}>
-                    <IconoSubir /> {cargando === "nps" ? "Cargando..." : "Elegir archivo"}
-                    <input ref={refNPS} type="file" accept=".csv,.xlsx,.xls" onChange={() => subir(refNPS, "nps")} style={{ display: "none" }} disabled={!!cargando} />
+                    <IconoSubir /> {leyendo === "nps" ? "Leyendo..." : "Elegir archivo"}
+                    <input ref={refNPS} type="file" accept=".csv,.xlsx,.xls" onChange={() => elegirArchivo(refNPS, "nps")} style={{ display: "none" }} disabled={!!leyendo || guardando} />
                   </label>
+                  {pendNPS && (
+                    <div style={{ marginTop: 8, fontSize: 11, color: T.green, display: "flex", alignItems: "center", gap: 5 }}>
+                      <IconoCheckCirculo tam={13} /> {pendNPS.nombreArchivo} · {pendNPS.filas.length} filas
+                    </div>
+                  )}
                 </div>
               </div>
+
+              {combinado && (
+                <div style={{ marginTop: 18, background: T.surface2, borderRadius: 11, padding: 16 }}>
+                  <p style={{ fontSize: 12.5, fontWeight: 700, marginBottom: 8 }}>Vista previa del cruce</p>
+                  <p style={{ fontSize: 12, color: T.inkSoft, marginBottom: 4 }}>
+                    Base de <b style={{ color: T.ink }}>{combinado.totalContratos}</b> socios (Contratos a vencer).
+                  </p>
+                  <p style={{ fontSize: 12, color: T.inkSoft, marginBottom: 4 }}>
+                    {pendAccesos
+                      ? <><b style={{ color: T.ink }}>{combinado.matchAccesos}</b> de {combinado.totalAccesos} DNI de Accesos coincidieron con la base y se van a sumar. El resto se descarta.</>
+                      : "Sin planilla de Accesos: la asistencia va a quedar vacía para todos."}
+                  </p>
+                  <p style={{ fontSize: 12, color: T.inkSoft, marginBottom: 14 }}>
+                    {pendNPS
+                      ? <><b style={{ color: T.ink }}>{combinado.matchNPS}</b> de {combinado.totalNPS} DNI de NPS coincidieron con la base y se van a sumar. El resto se descarta.</>
+                      : "Sin planilla de NPS: el NPS va a quedar vacío para todos."}
+                  </p>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button style={btnVerde} disabled={guardando} onClick={confirmarCargaMes}>
+                      {guardando ? "Guardando..." : "Confirmar carga del mes"}
+                    </button>
+                    <button style={btnOut} disabled={guardando} onClick={limpiarPendientes}>Cancelar</button>
+                  </div>
+                </div>
+              )}
+
               {resultadoCarga && (
                 <p style={{ marginTop: 14, fontSize: 12.5, color: resultadoCarga.tipo === "err" ? T.red : T.green }}>{resultadoCarga.txt}</p>
               )}

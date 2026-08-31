@@ -159,60 +159,57 @@ export function parsearNPS(filas) {
 }
 
 /* ============================================================
-   Carga a la base. Contratos crea/pisa la base del mes. Accesos
-   y NPS solo ENRIQUECEN filas que ya existen para ese mismo mes
-   (los DNI que no estan en la base de contratos de ese mes se
-   descartan) — asi el universo siempre lo define "Contratos a
-   vencer", como pediste.
+   Carga a la base: todo se combina en el navegador ANTES de
+   guardar nada. Contratos define el universo de DNI del mes;
+   Accesos y NPS solo aportan datos a esos mismos DNI (lo que no
+   matchea se informa pero se descarta). Se graba todo junto con
+   un solo guardado, para que no haya pasos parciales confusos.
    ============================================================ */
-export async function cargarContratos(filasParsed, { nombre, cargo, creadoPor }) {
+export function combinarPlanillas(contratosParsed, accesosParsed, npsParsed) {
+  const accesosPorDni = {};
+  accesosParsed.forEach((a) => { accesosPorDni[a.dni] = a; });
+  const npsPorDni = {};
+  npsParsed.forEach((n) => { npsPorDni[n.dni] = n; });
+
+  let matchAccesos = 0, matchNPS = 0;
+  const filas = contratosParsed.map((c) => {
+    const acc = accesosPorDni[c.dni];
+    const nps = npsPorDni[c.dni];
+    if (acc) matchAccesos++;
+    if (nps) matchNPS++;
+    return {
+      ...c,
+      asistencias_2m: acc ? acc.asistencias_2m : null,
+      telefono: (nps && nps.telefono) || (acc && acc.telefono) || null,
+      email: (nps && nps.email) || (acc && acc.email) || null,
+      nps_score: nps ? nps.nps_score : null,
+      nps_comentario: nps ? nps.nps_comentario : null,
+      nps_fecha_respuesta: nps ? nps.nps_fecha_respuesta : null,
+    };
+  });
+
+  return {
+    filas,
+    totalContratos: contratosParsed.length,
+    totalAccesos: accesosParsed.length,
+    totalNPS: npsParsed.length,
+    matchAccesos, matchNPS,
+  };
+}
+
+export async function guardarSeguimientoMes(filas, { nombre, cargo, creadoPor }) {
   const mesCarga = hoyYYYYMM();
-  const filas = filasParsed.map((r) => ({
+  const filasFinal = filas.map((r) => ({
     ...r, mes_carga: mesCarga, subido_por: nombre, cargo_subido_por: cargo, creado_por: creadoPor,
   }));
-  const { error } = await supabase.from("seguimiento_contratos").upsert(filas, { onConflict: "dni,mes_carga" });
-  if (error) throw error;
-  return filas.length;
-}
-
-async function enriquecer(filasNuevas, camposDe) {
-  const mesCarga = hoyYYYYMM();
-  const { data: existentes, error } = await supabase
-    .from("seguimiento_contratos")
-    .select("*")
-    .eq("mes_carga", mesCarga);
-  if (error) throw error;
-  const porDni = {};
-  existentes.forEach((r) => { porDni[r.dni] = r; });
-
-  const actualizaciones = [];
-  let coincidencias = 0;
-  for (const fila of filasNuevas) {
-    const base = porDni[fila.dni];
-    if (!base) continue; // no esta en la base de Contratos de este mes: se descarta
-    coincidencias++;
-    actualizaciones.push({ ...base, ...camposDe(fila, base) });
+  // Insertamos en lotes para no mandar miles de filas en un solo pedido.
+  const LOTE = 500;
+  for (let i = 0; i < filasFinal.length; i += LOTE) {
+    const parte = filasFinal.slice(i, i + LOTE);
+    const { error } = await supabase.from("seguimiento_contratos").upsert(parte, { onConflict: "dni,mes_carga" });
+    if (error) throw error;
   }
-  if (actualizaciones.length) {
-    const { error: err2 } = await supabase.from("seguimiento_contratos").upsert(actualizaciones, { onConflict: "dni,mes_carga" });
-    if (err2) throw err2;
-  }
-  return { coincidencias, total: filasNuevas.length };
-}
-
-export function cargarAccesos(filasParsed) {
-  return enriquecer(filasParsed, (f, base) => ({
-    asistencias_2m: f.asistencias_2m,
-    telefono: f.telefono || base.telefono,
-    email: f.email || base.email,
-  }));
-}
-export function cargarNPS(filasParsed) {
-  return enriquecer(filasParsed, (f, base) => ({
-    nps_score: f.nps_score, nps_comentario: f.nps_comentario, nps_fecha_respuesta: f.nps_fecha_respuesta,
-    telefono: f.telefono || base.telefono,
-    email: f.email || base.email,
-  }));
+  return filasFinal.length;
 }
 
 /* ============================================================
