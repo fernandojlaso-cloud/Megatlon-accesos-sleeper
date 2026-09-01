@@ -22,7 +22,8 @@ const RIESGO_POR_MOTIVO = {
 
 const hoyStr = () => new Date().toISOString().slice(0, 10);
 const fmt = (iso) => { if (!iso) return "—"; const [y, m, d] = iso.split("-"); return `${d}/${m}/${y}`; };
-const norm = (s) => (s || "").toString().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+const norm = (s) => (s || "").toString().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+  .replace(/[[\]]/g, "").replace(/_/g, " ").trim();
 const diasEntre = (desde, hasta) => {
   if (!desde) return 0;
   const d1 = new Date(desde + "T00:00:00");
@@ -147,13 +148,14 @@ function mapRow(row, defaults) {
     return "";
   };
   const findTxt = (...names) => (find(...names) || "").toString().trim();
+  const nombreCombinado = [findTxt("nombre socio", "nombre"), findTxt("apellido socio", "apellido")].filter(Boolean).join(" ").trim();
   return {
-    nombre: findTxt("nombre", "socio", "cliente", "nombre y apellido"),
-    dni: findTxt("dni", "documento", "nro documento", "numero de documento", "cedula"),
-    email: findTxt("email", "correo", "mail", "e-mail"),
-    telefono: findTxt("telefono", "celular", "whatsapp", "tel", "numero", "número"),
-    sede: findTxt("sede", "sucursal") || defaults.sede,
-    ultimaVisita: findTxt("ultima visita", "fecha ultima visita", "ultimo ingreso"),
+    nombre: findTxt("nombre", "socio", "cliente", "nombre y apellido") || nombreCombinado,
+    dni: findTxt("dni", "documento", "nro documento", "numero de documento", "numero documento", "cedula"),
+    email: findTxt("email", "correo", "mail", "e-mail", "mail socio"),
+    telefono: findTxt("telefono", "celular", "whatsapp", "tel", "numero", "número", "telefono socio"),
+    sede: findTxt("sede", "sucursal", "sucursal acceso") || defaults.sede,
+    ultimaVisita: findTxt("ultima visita", "fecha ultima visita", "ultimo ingreso", "fecha ultimo acceso"),
     fechaFinContrato: normalizarFecha(find("fin de su contrato", "fin de contrato", "fin contrato", "vencimiento", "vencimiento plan", "fecha vencimiento", "fecha fin contrato")),
   };
 }
@@ -253,6 +255,11 @@ export default function Sleepers({ perfil, cargoFirma }) {
       if (ext === "csv") {
         const text = await file.text();
         filas = parseCSV(text);
+      } else if (ext === "json") {
+        const text = await file.text();
+        const parsed = JSON.parse(text);
+        filas = Array.isArray(parsed) ? parsed : (parsed.data || parsed.socios || parsed.rows || parsed.items || []);
+        if (!Array.isArray(filas)) filas = [];
       } else {
         const buf = await file.arrayBuffer();
         const wb = XLSX.read(buf, { type: "array", cellDates: true });
@@ -260,7 +267,7 @@ export default function Sleepers({ perfil, cargoFirma }) {
         filas = XLSX.utils.sheet_to_json(sheet, { defval: "" });
       }
     } catch {
-      alert("No pude leer el archivo. Revisá que sea un .csv o .xlsx válido.");
+      alert("No pude leer el archivo. Revisá que sea un .csv, .xlsx o .json válido.");
       return;
     }
     const defaults = { sede: esDireccion ? "" : perfil.sede };
@@ -429,8 +436,8 @@ export default function Sleepers({ perfil, cargoFirma }) {
             <div style={{ border: "1px solid " + T.line, borderTop: "none", borderRadius: "0 0 16px 16px", padding: 20, background: T.surface }}>
               <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 14 }}>
                 <label style={{ ...btnMarca, display: "inline-flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
-                  <IconoSubir /> Elegir archivo (.xlsx o .csv)
-                  <input ref={fileRef} type="file" accept=".csv,.xlsx,.xls" onChange={onFileChange} style={{ display: "none" }} />
+                  <IconoSubir /> Elegir archivo (.xlsx, .csv o .json)
+                  <input ref={fileRef} type="file" accept=".csv,.xlsx,.xls,.json" onChange={onFileChange} style={{ display: "none" }} />
                 </label>
                 <button style={s.ghostBtn} onClick={descargarPlantilla}><IconoBajar /> Descargar planilla modelo</button>
                 <button style={s.ghostBtn} onClick={exportarCSV}><IconoBajar /> Exportar datos actuales (CSV)</button>
