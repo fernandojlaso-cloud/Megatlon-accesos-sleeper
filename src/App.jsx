@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { T, FUENTE, Logo } from "./estilos.jsx";
 import { useSesion, Auth, Pendiente, Equipo, Actividad, ROL_LABEL } from "./Acceso.jsx";
 import Sleepers from "./sleepers/Sleepers.jsx";
@@ -18,13 +18,19 @@ export default function App() {
   const { sesion, perfil, cargando, salir } = useSesion();
   const [solapa, setSolapa] = useState("sleepers");
   const CARGOS_FIRMA = ["Director", "Gerente", "Gerente de Servicio", "Coordinador de Servicio", "Referente de Servicio"];
-  const [cargoFirma, setCargoFirma] = useState(() => {
-    try { return localStorage.getItem("cargoFirma_" + perfil.id) || ROL_LABEL[perfil.rol] || "Gerente"; }
-    catch { return ROL_LABEL[perfil.rol] || "Gerente"; }
-  });
+  const [cargoFirma, setCargoFirma] = useState("Gerente");
+  useEffect(() => {
+    if (!perfil) return;
+    try {
+      const guardado = localStorage.getItem("cargoFirma_" + perfil.id);
+      setCargoFirma(guardado || ROL_LABEL[perfil.rol] || "Gerente");
+    } catch {
+      setCargoFirma(ROL_LABEL[perfil.rol] || "Gerente");
+    }
+  }, [perfil?.id]);
   function cambiarCargoFirma(valor) {
     setCargoFirma(valor);
-    try { localStorage.setItem("cargoFirma_" + perfil.id, valor); } catch {}
+    try { if (perfil) localStorage.setItem("cargoFirma_" + perfil.id, valor); } catch {}
   }
 
   // Cargando
