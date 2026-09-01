@@ -80,8 +80,9 @@ export default function Supervisor() {
     const saludable = contratosEnVentana.filter((r) => r._clasif.completo && r._clasif.score >= 6).length;
     const incompleto = contratosEnVentana.filter((r) => !r._clasif.completo).length;
     const abiertos = contratosEnVentana.filter((r) => r.estado === "Abierto").length;
+    const enSeguimiento = contratosEnVentana.filter((r) => r.estado === "Seguimiento").length;
     const cerrados = contratosEnVentana.filter((r) => r.estado === "Cerrado").length;
-    return { total: contratosEnVentana.length, critico, atencion, saludable, incompleto, abiertos, cerrados };
+    return { total: contratosEnVentana.length, critico, atencion, saludable, incompleto, abiertos, enSeguimiento, cerrados };
   }, [contratosEnVentana]);
 
   const contratosPorSede = useMemo(() => {
@@ -167,11 +168,12 @@ export default function Supervisor() {
       <p style={{ fontSize: 11.5, color: T.inkSoft, marginTop: -6, marginBottom: 14 }}>La asistencia es de los últimos 2 meses. El NPS es histórico (última respuesta del socio, sin importar hace cuánto).</p>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))", gap: 14, marginBottom: 22 }}>
         <Macro n={macroContratos.total} l="Total en ventana" color={T.marca} />
-        <Macro n={macroContratos.critico} l="Crítico" color={T.red} />
-        <Macro n={macroContratos.atencion} l="Atención" color={T.amber} />
-        <Macro n={macroContratos.saludable} l="Saludable" color={T.green} />
+        <Macro n={macroContratos.critico} l="Riesgo de baja" color={T.red} />
+        <Macro n={macroContratos.atencion} l="En seguimiento" color={T.amber} />
+        <Macro n={macroContratos.saludable} l="Fidelizado" color={T.green} />
         <Macro n={macroContratos.incompleto} l="Datos incompletos" color={T.line} />
         <Macro n={macroContratos.abiertos} l="Abiertos" color={T.amber} />
+        <Macro n={macroContratos.enSeguimiento} l="En seguimiento" color={T.amber} />
         <Macro n={macroContratos.cerrados} l="Cerrados" color={T.green} />
       </div>
 
@@ -182,12 +184,12 @@ export default function Supervisor() {
             <tr>
               <th style={th}>Sucursal</th>
               <th style={th}>Total</th>
-              <th style={th}>Crítico</th>
-              <th style={th}>Atención</th>
-              <th style={th}>Saludable</th>
+              <th style={th}>Riesgo de baja</th>
+              <th style={th}>En seguimiento</th>
+              <th style={th}>Fidelizado</th>
               <th style={th}>Incompletos</th>
               <th style={th}>Cerrados</th>
-              <th style={th}>% crítico</th>
+              <th style={th}>% riesgo de baja</th>
               <th style={th}>% cerrado</th>
             </tr>
           </thead>

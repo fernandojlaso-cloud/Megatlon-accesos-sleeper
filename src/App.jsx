@@ -17,6 +17,15 @@ const TITULO = "SLEEPER MEGATLON";
 export default function App() {
   const { sesion, perfil, cargando, salir } = useSesion();
   const [solapa, setSolapa] = useState("sleepers");
+  const CARGOS_FIRMA = ["Director", "Gerente", "Gerente de Servicio", "Coordinador de Servicio", "Referente de Servicio"];
+  const [cargoFirma, setCargoFirma] = useState(() => {
+    try { return localStorage.getItem("cargoFirma_" + perfil.id) || ROL_LABEL[perfil.rol] || "Gerente"; }
+    catch { return ROL_LABEL[perfil.rol] || "Gerente"; }
+  });
+  function cambiarCargoFirma(valor) {
+    setCargoFirma(valor);
+    try { localStorage.setItem("cargoFirma_" + perfil.id, valor); } catch {}
+  }
 
   // Cargando
   if (sesion === undefined || (sesion && cargando && !perfil)) {
@@ -36,14 +45,17 @@ export default function App() {
 
   const esDireccion = perfil.rol === "director";
   const esSupervisor = perfil.rol === "supervisor";
-  const puedeEquipo = esDireccion || perfil.rol === "gerente";
+  const esGerente = perfil.rol === "gerente";
+  const puedeEquipo = esDireccion || esGerente;
+  const puedeAdministrador = esDireccion || esGerente;
 
   const SOLAPAS = esSupervisor
     ? [["panorama", "Panorama"]]
     : [
         ["sleepers", "Sleepers"],
         ["contratos", "Contratos a Vencer"],
-        ...(esDireccion ? [["panorama", "Panorama"], ["administrador", "Administrador"]] : []),
+        ...(esDireccion ? [["panorama", "Panorama"]] : []),
+        ...(puedeAdministrador ? [["administrador", "Administrador"]] : []),
         ...(puedeEquipo ? [["equipo", "Equipo"], ["actividad", "Actividad"]] : []),
       ];
   const solapaActual = esSupervisor ? "panorama" : solapa;
@@ -61,6 +73,16 @@ export default function App() {
                 {ROL_LABEL[perfil.rol]}{(esDireccion || esSupervisor) ? " - Todas las sedes" : " - " + perfil.sede}
               </div>
             </div>
+            {!esSupervisor && (
+              <div style={{ textAlign: "right" }}>
+                <label style={{ fontSize: 9.5, color: T.inkSoft, textTransform: "uppercase", letterSpacing: ".04em", display: "block", marginBottom: 2 }}>Firmo mensajes como</label>
+                <select value={cargoFirma} onChange={(e) => cambiarCargoFirma(e.target.value)}
+                  style={{ background: T.surface2, border: "1px solid " + T.line, color: T.ink, fontSize: 11.5,
+                    padding: "5px 8px", borderRadius: 8, fontFamily: FUENTE }}>
+                  {CARGOS_FIRMA.map((c) => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+            )}
             <button onClick={salir} style={{ border: "1px solid " + T.line, background: "transparent",
               color: T.inkSoft, fontWeight: 600, fontSize: 12, padding: "8px 15px", borderRadius: 999,
               cursor: "pointer", fontFamily: FUENTE }}>Salir</button>
@@ -84,9 +106,9 @@ export default function App() {
       </div>
 
       <main style={{ maxWidth: ["sleepers","administrador","panorama","contratos"].includes(solapaActual) ? 1900 : 1000, margin: "0 auto", padding: "20px 16px 60px" }}>
-        {solapaActual === "sleepers" && <Sleepers perfil={perfil} />}
-        {solapaActual === "contratos" && <ContratosVencer perfil={perfil} />}
-        {solapaActual === "administrador" && esDireccion && <Administrador />}
+        {solapaActual === "sleepers" && <Sleepers perfil={perfil} cargoFirma={cargoFirma} />}
+        {solapaActual === "contratos" && <ContratosVencer perfil={perfil} cargoFirma={cargoFirma} />}
+        {solapaActual === "administrador" && puedeAdministrador && <Administrador perfil={perfil} />}
         {solapaActual === "equipo" && puedeEquipo && <Equipo perfil={perfil} />}
         {solapaActual === "actividad" && puedeEquipo && <Actividad />}
         {solapaActual === "panorama" && (esSupervisor || esDireccion) && <Supervisor />}

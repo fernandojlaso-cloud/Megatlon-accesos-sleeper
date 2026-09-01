@@ -161,7 +161,7 @@ function mapRow(row, defaults) {
 /* ============================================================
    Componente principal
    ============================================================ */
-export default function Sleepers({ perfil }) {
+export default function Sleepers({ perfil, cargoFirma }) {
   const { casos: casosCrudos, comentariosPorCaso, recargarComentarios } = useCasos();
   const { totales, guardar: guardarTotal } = useSociosTotales();
 
@@ -173,7 +173,7 @@ export default function Sleepers({ perfil }) {
   const esDireccion = perfil.rol === "director";
   const puedeEditarIdentidad = ["director", "gerente"].includes(perfil.rol);
   const puedeCargar = ["director", "gerente", "gerente_servicio", "coordinador_servicio", "referente_servicio"].includes(perfil.rol);
-  const cargoLabel = {
+  const cargoLabel = cargoFirma || {
     director: "Director", gerente: "Gerente",
     gerente_servicio: "Gerente de Servicio",
     coordinador_servicio: "Coordinador de Servicio",

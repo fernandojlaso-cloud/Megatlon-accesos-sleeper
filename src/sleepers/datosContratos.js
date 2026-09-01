@@ -62,6 +62,10 @@ export async function eliminarRegistros(ids) {
   const { error } = await supabase.from("seguimiento_contratos").delete().in("id", ids);
   if (error) throw error;
 }
+export async function reasignarSedeRegistros(ids, nuevaSede) {
+  const { error } = await supabase.from("seguimiento_contratos").update({ sede: nuevaSede }).in("id", ids);
+  if (error) throw error;
+}
 export async function agregarComentarioRegistro(registroId, { texto, autor, cargo, creadoPor }) {
   const { error } = await supabase.from("seguimiento_contratos_comentarios").insert({
     registro_id: registroId, texto, autor, cargo, creado_por: creadoPor,

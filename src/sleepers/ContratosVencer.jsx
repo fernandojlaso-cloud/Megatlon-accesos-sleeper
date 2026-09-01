@@ -62,7 +62,7 @@ function leerArchivo(file) {
   });
 }
 
-export default function ContratosVencer({ perfil }) {
+export default function ContratosVencer({ perfil, cargoFirma }) {
   const { registros: crudos, comentariosPorRegistro, recargarComentarios } = useSeguimientoContratos();
   const registros = useMemo(() => crudos.map((r) => {
     let clasif = clasificar(r);
@@ -78,7 +78,7 @@ export default function ContratosVencer({ perfil }) {
     return { ...r, _clasif: clasif, _numComentarios: (comentariosPorRegistro[r.id] || []).length };
   }), [crudos, comentariosPorRegistro]);
 
-  const cargoLabel = {
+  const cargoLabel = cargoFirma || {
     director: "Director", gerente: "Gerente",
     gerente_servicio: "Gerente de Servicio", coordinador_servicio: "Coordinador de Servicio", referente_servicio: "Referente de Servicio",
   }[perfil.rol] || "Gerente";
@@ -141,8 +141,9 @@ export default function ContratosVencer({ perfil }) {
     const atencion = base.filter((r) => r._clasif.completo && r._clasif.score >= 3 && r._clasif.score <= 5).length;
     const saludable = base.filter((r) => r._clasif.completo && r._clasif.score >= 6).length;
     const incompleto = base.filter((r) => !r._clasif.completo).length;
+    const enSeguimiento = base.filter((r) => r.estado === "Seguimiento").length;
     const cerrados = base.filter((r) => r.estado === "Cerrado").length;
-    return { total: base.length, critico, atencion, saludable, incompleto, cerrados };
+    return { total: base.length, critico, atencion, saludable, incompleto, enSeguimiento, cerrados };
   }, [filtrados]);
 
   async function elegirArchivo(ref, tipo) {
@@ -349,9 +350,9 @@ export default function ContratosVencer({ perfil }) {
           <label style={lab}>Clasificación</label>
           <select style={inp} value={filtroClasif} onChange={(e) => setFiltroClasif(e.target.value)}>
             <option value="">Todas</option>
-            <option value="critico">Crítico (1-2)</option>
-            <option value="atencion">Atención (3-5)</option>
-            <option value="saludable">Saludable (6-10)</option>
+            <option value="critico">Riesgo de baja (1-2)</option>
+            <option value="atencion">En seguimiento (3-5)</option>
+            <option value="saludable">Fidelizado (6-10)</option>
             <option value="incompleto">Datos incompletos</option>
           </select>
         </div>
@@ -359,6 +360,7 @@ export default function ContratosVencer({ perfil }) {
           <label style={lab}>Estado</label>
           <select style={inp} value={filtroEstado} onChange={(e) => setFiltroEstado(e.target.value)}>
             <option value="Abierto">Abiertos</option>
+            <option value="Seguimiento">En seguimiento</option>
             <option value="Cerrado">Cerrados</option>
             <option value="">Todos</option>
           </select>
@@ -394,10 +396,11 @@ export default function ContratosVencer({ perfil }) {
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(140px,1fr))", gap: 12, marginBottom: 26 }}>
         <StatCard n={stats.total} l="En ventana 91-150 días" color={T.marca} />
-        <StatCard n={stats.critico} l="Crítico" color={T.red} />
-        <StatCard n={stats.atencion} l="Atención" color={T.amber} />
-        <StatCard n={stats.saludable} l="Saludable" color={T.green} />
+        <StatCard n={stats.critico} l="Riesgo de baja" color={T.red} />
+        <StatCard n={stats.atencion} l="En seguimiento" color={T.amber} />
+        <StatCard n={stats.saludable} l="Fidelizado" color={T.green} />
         <StatCard n={stats.incompleto} l="Datos incompletos" color={T.line} />
+        <StatCard n={stats.enSeguimiento} l="En seguimiento" color={T.amber} />
         <StatCard n={stats.cerrados} l="Cerrados" color={T.green} />
       </div>
 
@@ -416,9 +419,9 @@ export default function ContratosVencer({ perfil }) {
             const dias = diasEntre(hoyStr(), r.fecha_fin_contrato);
             const c = r._clasif;
             const nota = c.forzadoPorFaltaDatos
-              ? "Vence en menos de 120 días y falta asistencia o NPS — se marca crítico por falta de datos, no por mal puntaje. Priorizá conseguir esa información."
+              ? "Vence en menos de 120 días y falta asistencia o NPS — se marca en Riesgo de baja por falta de datos, no por mal puntaje. Priorizá conseguir esa información."
               : c.soloAsistencia
-              ? "No respondió la encuesta de NPS — clasificado solo por asistencia (1-9 crítico, 10-28 atención, 29+ saludable)."
+              ? "No respondió la encuesta de NPS — clasificado solo por asistencia (1-9 Riesgo de baja, 10-28 En seguimiento, 29+ Fidelizado)."
               : (c.completo ? notaEspecial(c.nivel, c.segmento) : null);
             const hasPhone = r.telefono && r.telefono.length > 5;
             const hasEmail = r.email && r.email.includes("@");
@@ -498,9 +501,12 @@ export default function ContratosVencer({ perfil }) {
                   {r.fecha_envio_mensaje ? "Enviado: " + fmt(r.fecha_envio_mensaje) : "Sin enviar"}
                 </div>
 
-                <select style={{ ...inp, padding: "6px 8px", fontSize: 11.5, fontWeight: 700, background: r.estado === "Cerrado" ? T.greenSoft : T.redSoft, color: r.estado === "Cerrado" ? T.green : T.red }}
+                <select style={{ ...inp, padding: "6px 8px", fontSize: 11.5, fontWeight: 700,
+                  background: r.estado === "Cerrado" ? T.greenSoft : r.estado === "Seguimiento" ? T.amberSoft : T.redSoft,
+                  color: r.estado === "Cerrado" ? T.green : r.estado === "Seguimiento" ? T.amber : T.red }}
                   value={r.estado} onChange={(e) => cambiarEstado(r, e.target.value)}>
                   <option value="Abierto">Abierto</option>
+                  <option value="Seguimiento">Seguimiento (estamos en contacto)</option>
                   <option value="Cerrado">Cerrado (renovó o se dio de baja)</option>
                 </select>
               </div>
