@@ -183,6 +183,7 @@ export default function Sleepers({ perfil, cargoFirma }) {
   }[perfil.rol] || "Gerente";
 
   const [boAbierto, setBoAbierto] = useState(false);
+  const [manualAbierto, setManualAbierto] = useState(false);
   const [boTocado, setBoTocado] = useState(false);
   const [cargaInicialLista, setCargaInicialLista] = useState(false);
   useEffect(() => {
@@ -420,7 +421,29 @@ export default function Sleepers({ perfil, cargoFirma }) {
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", flexWrap: "wrap", gap: 12, marginBottom: 18 }}>
         <div style={{ fontSize: 13, textTransform: "uppercase", fontWeight: 800, letterSpacing: "-.01em", color: T.inkSoft }}>Seguimiento de sleepers</div>
+        <button onClick={() => setManualAbierto((v) => !v)} style={s.ghostBtn}>{manualAbierto ? "Ocultar manual" : "Manual de uso"}</button>
       </div>
+
+      {manualAbierto && (
+        <div style={{ background: T.surface, border: "1px solid " + T.line, borderRadius: 16, padding: 20, marginBottom: 22, fontSize: 12.5, color: T.inkSoft, lineHeight: 1.65 }}>
+          <p style={{ color: T.ink, fontWeight: 700, marginBottom: 6 }}>Qué es esta pantalla</p>
+          <p>Acá cargás y hacés seguimiento a los socios que dejaron de asistir ("sleepers"), hasta que vuelven a entrenar o se decide dar el caso por perdido. Cada gerente ve y trabaja los socios de su propia sede; Dirección ve todas.</p>
+          <p style={{ color: T.ink, fontWeight: 700, margin: "14px 0 6px" }}>Cargar socios</p>
+          <p>Con el botón "Back office" de arriba: por planilla (Excel, CSV o JSON — reconoce las columnas Nombre, DNI, Email, Teléfono, Sede, Última Visita y Fin de contrato sin importar mayúsculas ni el orden) o cargando uno a la vez a mano.</p>
+          <p style={{ color: T.ink, fontWeight: 700, margin: "14px 0 6px" }}>El semáforo de alarma</p>
+          <p><b style={{ color: T.ink }}>Verde</b>: recién cargado, sin contacto todavía. <b style={{ color: T.ink }}>Amarillo</b>: día 1 a 5, o ya hubo alguna interacción (mensaje enviado, motivo, riesgo, comentario o seguimiento programado). <b style={{ color: T.ink }}>Rojo</b>: 6 días o más sin ningún contacto. <b style={{ color: T.ink }}>Verde con tilde</b>: caso Cerrado (recuperado).</p>
+          <p style={{ color: T.ink, fontWeight: 700, margin: "14px 0 6px" }}>Motivo y riesgo automático</p>
+          <p>Al cargar el motivo por el que dejó de venir, el riesgo (Alto/Medio/Bajo) se calcula solo y queda bloqueado — no se puede tocar a mano mientras haya un motivo cargado.</p>
+          <p style={{ color: T.ink, fontWeight: 700, margin: "14px 0 6px" }}>Vencimiento de contrato</p>
+          <p>Si el socio tiene cargada la fecha de fin de contrato y le quedan 90 días o menos (o ya venció), la fila se marca con un marco rojo — distinto del rojo del semáforo, que es por falta de respuesta.</p>
+          <p style={{ color: T.ink, fontWeight: 700, margin: "14px 0 6px" }}>Contacto</p>
+          <p>Los botones de WhatsApp y Email abren el chat o el mail con un mensaje ya redactado y personalizado. El email sale sin la firma final (tu cliente de correo ya agrega la suya); WhatsApp sí lleva la firma completa. El primer envío queda registrado con fecha.</p>
+          <p style={{ color: T.ink, fontWeight: 700, margin: "14px 0 6px" }}>Comentarios y estado</p>
+          <p>Podés ir agregando todos los comentarios que hagan falta por socio, con fecha y quién lo escribió. El estado (Abierto/Cerrado) marca si el caso sigue en seguimiento o ya se resolvió — cerrar no borra la información, solo deja de aparecer en el filtro "Abiertos" por defecto.</p>
+          <p style={{ color: T.ink, fontWeight: 700, margin: "14px 0 6px" }}>Quién puede corregir o eliminar</p>
+          <p>Corregir nombre, DNI, email, teléfono o sede: Dirección o Gerente, desde la solapa Administrador. Eliminar un socio: exclusivo de Dirección.</p>
+        </div>
+      )}
 
       {puedeCargar && (
         <div style={{ marginBottom: 22 }}>

@@ -174,6 +174,8 @@ function SegmentoContratos({ puedeEliminar }) {
   const [busqueda, setBusqueda] = useState("");
   const [filtroSede, setFiltroSede] = useState("");
   const [filtroClasif, setFiltroClasif] = useState("");
+  const [filtroVenceDesde, setFiltroVenceDesde] = useState("");
+  const [filtroVenceHasta, setFiltroVenceHasta] = useState("");
   const [seleccionados, setSeleccionados] = useState(new Set());
   const [nuevaSede, setNuevaSede] = useState("");
   const [ediciones, setEdiciones] = useState({});
@@ -188,10 +190,12 @@ function SegmentoContratos({ puedeEliminar }) {
       if (filtroClasif === "atencion" && !(s.completo && s.score >= 3 && s.score <= 5)) return false;
       if (filtroClasif === "saludable" && !(s.completo && s.score >= 6)) return false;
     }
+    if (filtroVenceDesde && (!r.fecha_fin_contrato || r.fecha_fin_contrato < filtroVenceDesde)) return false;
+    if (filtroVenceHasta && (!r.fecha_fin_contrato || r.fecha_fin_contrato > filtroVenceHasta)) return false;
     const b = norm(busqueda);
     if (b && !(norm(r.nombre).includes(b) || norm(r.dni).includes(b))) return false;
     return true;
-  }), [registros, filtroSede, filtroClasif, busqueda]);
+  }), [registros, filtroSede, filtroClasif, busqueda, filtroVenceDesde, filtroVenceHasta]);
 
   function toggle(id) { setSeleccionados((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; }); }
   function toggleTodos() { setSeleccionados((prev) => prev.size === filtrados.length ? new Set() : new Set(filtrados.map((r) => r.id))); }
@@ -237,6 +241,14 @@ function SegmentoContratos({ puedeEliminar }) {
             <option value="saludable">Fidelizado (6-10)</option>
             <option value="incompleto">Datos incompletos</option>
           </select>
+        </div>
+        <div style={{ minWidth: 150 }}>
+          <label style={lab}>Vencimiento desde</label>
+          <input type="date" style={inp} value={filtroVenceDesde} onChange={(e) => setFiltroVenceDesde(e.target.value)} />
+        </div>
+        <div style={{ minWidth: 150 }}>
+          <label style={lab}>Vencimiento hasta</label>
+          <input type="date" style={inp} value={filtroVenceHasta} onChange={(e) => setFiltroVenceHasta(e.target.value)} />
         </div>
         <div style={{ flex: 1, minWidth: 200 }}>
           <label style={lab}>Buscar</label>

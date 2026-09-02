@@ -85,6 +85,7 @@ export default function ContratosVencer({ perfil, cargoFirma }) {
   const puedeCargar = ["director", "gerente", "gerente_servicio", "coordinador_servicio", "referente_servicio"].includes(perfil.rol);
 
   const [boAbierto, setBoAbierto] = useState(false);
+  const [manualAbierto, setManualAbierto] = useState(false);
   const [leyendo, setLeyendo] = useState(null);
   const [guardando, setGuardando] = useState(false);
   const [resultadoCarga, setResultadoCarga] = useState(null);
@@ -237,11 +238,31 @@ export default function ContratosVencer({ perfil, cargoFirma }) {
 
   return (
     <div>
-      <div style={{ marginBottom: 18 }}>
-        <div style={{ fontSize: 13, textTransform: "uppercase", fontWeight: 800, letterSpacing: "-.01em", color: T.inkSoft }}>Seguimiento de contratos a vencer</div>
-        <p style={{ fontSize: 12, color: T.inkSoft, marginTop: 4 }}>Socios activos cuyo contrato vence entre 91 y 150 días desde hoy, cruzando Contratos + Accesos + NPS por DNI.</p>
-        <p style={{ fontSize: 11.5, color: T.inkSoft, marginTop: 4 }}>La <b style={{ color: T.ink }}>asistencia</b> es de los últimos 2 meses. El <b style={{ color: T.ink }}>NPS</b> es histórico (la última respuesta que dio el socio, sin importar hace cuánto).</p>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 12, marginBottom: 18 }}>
+        <div>
+          <div style={{ fontSize: 13, textTransform: "uppercase", fontWeight: 800, letterSpacing: "-.01em", color: T.inkSoft }}>Seguimiento de contratos a vencer</div>
+          <p style={{ fontSize: 12, color: T.inkSoft, marginTop: 4 }}>Socios activos cuyo contrato vence entre 91 y 150 días desde hoy, cruzando Contratos + Accesos + NPS por DNI.</p>
+          <p style={{ fontSize: 11.5, color: T.inkSoft, marginTop: 4 }}>La <b style={{ color: T.ink }}>asistencia</b> es de los últimos 2 meses. El <b style={{ color: T.ink }}>NPS</b> es histórico (la última respuesta que dio el socio, sin importar hace cuánto).</p>
+        </div>
+        <button onClick={() => setManualAbierto((v) => !v)} style={btnOut}>{manualAbierto ? "Ocultar manual" : "Manual de uso"}</button>
       </div>
+
+      {manualAbierto && (
+        <div style={{ background: T.surface, border: "1px solid " + T.line, borderRadius: 16, padding: 20, marginBottom: 22, fontSize: 12.5, color: T.inkSoft, lineHeight: 1.65 }}>
+          <p style={{ color: T.ink, fontWeight: 700, marginBottom: 6 }}>Qué es esta pantalla</p>
+          <p>Seguimiento proactivo de socios activos cuyo contrato está por vencer (91 a 150 días desde hoy), para detectar quiénes tienen riesgo de no renovar antes de que sea tarde.</p>
+          <p style={{ color: T.ink, fontWeight: 700, margin: "14px 0 6px" }}>Las 3 planillas y cómo se cruzan</p>
+          <p><b style={{ color: T.ink }}>Contratos a vencer</b> define la base del mes (DNI, nombre, sede, fecha de vencimiento). <b style={{ color: T.ink }}>Accesos</b> aporta la asistencia de los últimos 2 meses. <b style={{ color: T.ink }}>NPS y comentarios</b> aporta la última encuesta respondida. Se cruzan por DNI: lo que no está en la base de Contratos de ese mes se descarta (y te avisa cuántos). Se leen las 3 en el navegador con vista previa, y se guardan todas juntas con "Confirmar carga del mes".</p>
+          <p style={{ color: T.ink, fontWeight: 700, margin: "14px 0 6px" }}>La clasificación (1 a 10)</p>
+          <p>Cruza el nivel de asistencia (Baja/Media/Alta) con el segmento de NPS (Detractor/Pasivo/Promotor). Los tres grupos de resultado son: <b style={{ color: T.red }}>Riesgo de baja</b> (1-2), <b style={{ color: T.amber }}>En seguimiento</b> (3-5) y <b style={{ color: T.green }}>Fidelizado</b> (6-10). Hay dos casos especiales marcados aparte: mucha asistencia pero mal NPS (posible boca en boca negativo), y poca asistencia pero buen NPS (le gusta pero no lo usa). Si no respondió la encuesta, se clasifica solo por asistencia con otros cortes (1-9 / 10-28 / 29+), y te avisa que fue así. Si a menos de 120 días del vencimiento falta asistencia o NPS, se marca Riesgo de baja directamente por falta de datos.</p>
+          <p style={{ color: T.ink, fontWeight: 700, margin: "14px 0 6px" }}>Mensajes</p>
+          <p>Cada tarjeta trae un mensaje sugerido según su clasificación (enfocado en asistencia y experiencia, no en el vencimiento del plan). Se puede ver y editar antes de enviar con el botón "Ver / editar mensaje" — el cambio queda guardado para ese socio. El email sale sin la firma final; WhatsApp sí la lleva completa.</p>
+          <p style={{ color: T.ink, fontWeight: 700, margin: "14px 0 6px" }}>Estados</p>
+          <p><b style={{ color: T.ink }}>Abierto</b>: todavía sin trabajar. <b style={{ color: T.ink }}>Seguimiento</b>: ya estás en contacto con el socio. <b style={{ color: T.ink }}>Cerrado</b>: renovó o se dio de baja.</p>
+          <p style={{ color: T.ink, fontWeight: 700, margin: "14px 0 6px" }}>Quién puede corregir o eliminar</p>
+          <p>Corregir nombre, DNI, email, teléfono o sede: Dirección o Gerente, desde la solapa Administrador. Eliminar un registro: exclusivo de Dirección.</p>
+        </div>
+      )}
 
       {puedeCargar && (
         <div style={{ marginBottom: 22 }}>

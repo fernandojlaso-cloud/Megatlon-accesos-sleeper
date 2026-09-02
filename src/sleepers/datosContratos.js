@@ -303,73 +303,71 @@ function cuerpoPorClasificacion(nivel, segmento, nombreCompleto) {
   const CUERPOS = {
     "Baja|Detractor": `Hola ${first},
 
-Hace un tiempo que no te veo por el gym. Además leí tu comentario sobre tu experiencia con nosotros, y la verdad quiero escucharte — capaz hay algo puntual que podemos resolver.
+Hace unos días noté que no estás viniendo seguido y leí tu comentario sobre tu experiencia. Me importa mucho escucharte y saber qué podemos resolver.
 
-¿Tenés unos minutos para que hablemos, aunque sea por teléfono? Me importa mucho tu opinión y prefiero conversarlo directamente con vos.
+¿Tenés 5 minutos hoy para que lo charlemos por teléfono o preferís que lo conversemos por acá? Quiero asegurarme de darte una solución.
 
 ${ANCLA_CIERRE}`,
 
     "Baja|Pasivo": `Hola ${first},
 
-Noté que hace un tiempo no te veo entrenando. Quería saber cómo estás y si hay algo que te esté complicando venir — a veces alcanza con ajustar el horario o la rutina.
+¡Cómo estás! Noté que bajaste la frecuencia de entrenamiento estas semanas. Quería saber si hay algo en lo que te pueda ayudar o si algo te está complicando venir.
 
-Si querés, coordinamos una vuelta con onboarding para que retomes con todo.
+Si querés, coordinamos un re-onboarding para armar una rutina nueva y retomar con todo. ¡Avisame!
 
 ${ANCLA_CIERRE}`,
 
     "Media|Detractor": `Hola ${first},
 
-Quería charlar con vos porque vi que no estuviste del todo conforme con tu experiencia. Me gustaría entender bien qué podemos mejorar.
+¿Cómo va? Estuve viendo tus comentarios y noté que hay cosas de tu experiencia en la sede que no te cerraron del todo. Me gustaría entender bien qué podemos mejorar.
 
-¿Tenés unos minutos esta semana para que lo charlemos?
+¿Tendrás unos minutos esta semana para charlarlo brevemente?
 
 ${ANCLA_CIERRE}`,
 
     "Alta|Detractor": `Hola ${first},
 
-Te veo seguido por el gym, así que antes que nada: ¡gracias por tu constancia! Pero también vi que tu comentario no fue del todo positivo, y me importa entender por qué — viniendo tanto, quiero asegurarme de que tu experiencia sea la mejor posible.
+¡Te veo entrenando un montón y te agradezco un montón la constancia! Por otro lado, vi que tu devolución no fue del todo positiva y quiero entender por qué. Viniendo tanto, tu experiencia tiene que ser impecable.
 
-¿Podemos charlarlo en persona la próxima vez que vengas, o preferís que te llame?
+¿Charlamos un minutito la próxima vez que pases por recepción?
 
 ${ANCLA_CIERRE}`,
 
     "Media|Pasivo": `Hola ${first},
 
-Quería contactarte para ver cómo veniste entrenando últimamente y si hay algo en lo que te podamos ayudar.
+¡Hola! Quería escribirte para saber cómo venís con tus entrenamientos y si hay algo en lo que te podamos dar una mano para que disfrutes más de la sede.
 
-¿Tenés unos minutos para charlarlo?
+¿Cómo viene tu semana?
 
 ${ANCLA_CIERRE}`,
 
     "Baja|Promotor": `Hola ${first},
 
-Sabemos que nos tenés buena onda, ¡y eso nos pone muy contentos! Pero noté que hace un tiempo no te veo por el gym.
+¡Sabemos que nos tenés súper buena onda y eso nos encanta! Pero noté que hace un tiempo no te cruzamos por el club.
 
-¿Te copa que te arme una rutina corta o te sume a alguna clase para volver con ganas? Contame qué día te queda bien.
+¿Te armamos una rutina corta o te sumamos a alguna clase para volver con ganas esta semana? Contame qué día te queda cómodo.
 
 ${ANCLA_CIERRE}`,
 
     "Media|Promotor": `Hola ${first},
 
-¡Qué bueno tenerte como socio! Quería saber cómo veniste entrenando y si hay algo que podamos hacer para que sumes más días.
+¡Qué bueno tenerte siempre firme como socio! Quería saber cómo venís entrenando y si conocés nuestra grilla actual de clases o si precisás renovar tu plan de entrenamiento.
 
-¿Charlamos esta semana?
+¡Estamos para lo que necesites!
 
 ${ANCLA_CIERRE}`,
 
     "Alta|Pasivo": `Hola ${first},
 
-Te vemos seguido por el gym, ¡genial! Te escribo simplemente para saber cómo la estás pasando y si hay algo que podamos mejorar para vos.
-
-¿Cuándo te queda bien que lo charlemos?
+Te vemos siempre entrenando por acá y nos encanta tu constancia — ¡gracias por elegirnos! Te escribo simplemente para saber cómo la estás pasando y si hay algo que podamos sumar para mejorar tu día a día en el club.
 
 ${ANCLA_CIERRE}`,
 
     "Alta|Promotor": `Hola ${first},
 
-Se nota tu compromiso viniendo tan seguido, ¡gracias por eso! Quería saludarte y contarte que estamos para lo que necesites.
+¡Se nota tu compromiso viniendo tan seguido, gracias por la buena energía de siempre! Queríamos saludarte y recordarte que estamos para lo que necesites.
 
-Ah, y si tenés algún amigo que quiera sumarse, avisame que tenemos beneficios para los dos.
+Ah, y si tenés algún amigo o familiar que quiera sumarse a entrenar, avisame: tenemos un beneficio especial para vos y 1 mes bonificado para él.
 
 ${ANCLA_CIERRE}`,
   };
