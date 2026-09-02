@@ -7,6 +7,7 @@ import {
   IconoChat, IconoMail, IconoAlerta, IconoReloj, IconoCheckCirculo, IconoX, IconoTrofeo,
   IconoCarpeta, IconoFlechaAbajo,
 } from "./iconos.jsx";
+import Evaluacion from "./Evaluacion.jsx";
 
 const MOTIVOS = ["Falta de tiempo", "Problemas personales", "Mudanza", "Lesión o problema de salud", "Problemas con el servicio", "Vacaciones", "Otro"];
 
@@ -184,6 +185,7 @@ export default function Sleepers({ perfil, cargoFirma }) {
 
   const [boAbierto, setBoAbierto] = useState(false);
   const [manualAbierto, setManualAbierto] = useState(false);
+  const [evalAbierta, setEvalAbierta] = useState(false);
   const [boTocado, setBoTocado] = useState(false);
   const [cargaInicialLista, setCargaInicialLista] = useState(false);
   useEffect(() => {
@@ -421,7 +423,10 @@ export default function Sleepers({ perfil, cargoFirma }) {
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", flexWrap: "wrap", gap: 12, marginBottom: 18 }}>
         <div style={{ fontSize: 13, textTransform: "uppercase", fontWeight: 800, letterSpacing: "-.01em", color: T.inkSoft }}>Seguimiento de sleepers</div>
-        <button onClick={() => setManualAbierto((v) => !v)} style={s.ghostBtn}>{manualAbierto ? "Ocultar manual" : "Manual de uso"}</button>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button onClick={() => setManualAbierto((v) => !v)} style={s.ghostBtn}>{manualAbierto ? "Ocultar manual" : "Manual de uso"}</button>
+          <button onClick={() => setEvalAbierta((v) => !v)} style={s.ghostBtn}>{evalAbierta ? "Ocultar evaluación" : "Evaluación"}</button>
+        </div>
       </div>
 
       {manualAbierto && (
@@ -444,6 +449,8 @@ export default function Sleepers({ perfil, cargoFirma }) {
           <p>Corregir nombre, DNI, email, teléfono o sede: Dirección o Gerente, desde la solapa Administrador. Eliminar un socio: exclusivo de Dirección.</p>
         </div>
       )}
+
+      {evalAbierta && <Evaluacion onCerrar={() => setEvalAbierta(false)} />}
 
       {puedeCargar && (
         <div style={{ marginBottom: 22 }}>

@@ -10,6 +10,7 @@ import {
   IconoSubir, IconoChat, IconoMail, IconoAlerta, IconoCheckCirculo, IconoX,
   IconoCarpeta, IconoFlechaAbajo, IconoReloj,
 } from "./iconos.jsx";
+import Evaluacion from "./Evaluacion.jsx";
 
 const hoyStr = () => new Date().toISOString().slice(0, 10);
 const fmt = (iso) => { if (!iso) return "—"; const [y, m, d] = iso.split("-"); return `${d}/${m}/${y}`; };
@@ -86,6 +87,7 @@ export default function ContratosVencer({ perfil, cargoFirma }) {
 
   const [boAbierto, setBoAbierto] = useState(false);
   const [manualAbierto, setManualAbierto] = useState(false);
+  const [evalAbierta, setEvalAbierta] = useState(false);
   const [leyendo, setLeyendo] = useState(null);
   const [guardando, setGuardando] = useState(false);
   const [resultadoCarga, setResultadoCarga] = useState(null);
@@ -244,7 +246,10 @@ export default function ContratosVencer({ perfil, cargoFirma }) {
           <p style={{ fontSize: 12, color: T.inkSoft, marginTop: 4 }}>Socios activos cuyo contrato vence entre 91 y 150 días desde hoy, cruzando Contratos + Accesos + NPS por DNI.</p>
           <p style={{ fontSize: 11.5, color: T.inkSoft, marginTop: 4 }}>La <b style={{ color: T.ink }}>asistencia</b> es de los últimos 2 meses. El <b style={{ color: T.ink }}>NPS</b> es histórico (la última respuesta que dio el socio, sin importar hace cuánto).</p>
         </div>
-        <button onClick={() => setManualAbierto((v) => !v)} style={btnOut}>{manualAbierto ? "Ocultar manual" : "Manual de uso"}</button>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button onClick={() => setManualAbierto((v) => !v)} style={btnOut}>{manualAbierto ? "Ocultar manual" : "Manual de uso"}</button>
+          <button onClick={() => setEvalAbierta((v) => !v)} style={btnOut}>{evalAbierta ? "Ocultar evaluación" : "Evaluación"}</button>
+        </div>
       </div>
 
       {manualAbierto && (
@@ -263,6 +268,8 @@ export default function ContratosVencer({ perfil, cargoFirma }) {
           <p>Corregir nombre, DNI, email, teléfono o sede: Dirección o Gerente, desde la solapa Administrador. Eliminar un registro: exclusivo de Dirección.</p>
         </div>
       )}
+
+      {evalAbierta && <Evaluacion onCerrar={() => setEvalAbierta(false)} />}
 
       {puedeCargar && (
         <div style={{ marginBottom: 22 }}>
