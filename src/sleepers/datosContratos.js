@@ -20,6 +20,7 @@ export function useSeguimientoContratos() {
         .from("seguimiento_contratos")
         .select("*")
         .order("fecha_fin_contrato", { ascending: true })
+        .order("id", { ascending: true })
         .range(desde, desde + TAM_PAGINA - 1);
       if (error) { console.error(error); break; }
       todos = todos.concat(data || []);
