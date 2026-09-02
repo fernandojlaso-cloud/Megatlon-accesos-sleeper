@@ -69,14 +69,34 @@ export async function actualizarCaso(id, campos) {
   if (error) throw error;
 }
 
+async function porLotes(ids, tam, fn) {
+  for (let i = 0; i < ids.length; i += tam) {
+    const parte = ids.slice(i, i + tam);
+    let intentos = 0;
+    while (true) {
+      try { await fn(parte); break; }
+      catch (err) {
+        intentos++;
+        if (intentos >= 4) throw err;
+        await new Promise((res) => setTimeout(res, 1000 * intentos));
+      }
+    }
+    if (i + tam < ids.length) await new Promise((res) => setTimeout(res, 300));
+  }
+}
+
 export async function eliminarCasos(ids) {
-  const { error } = await supabase.from("casos").delete().in("id", ids);
-  if (error) throw error;
+  await porLotes(ids, 150, async (parte) => {
+    const { error } = await supabase.from("casos").delete().in("id", parte);
+    if (error) throw error;
+  });
 }
 
 export async function reasignarSede(ids, nuevaSede) {
-  const { error } = await supabase.from("casos").update({ sede: nuevaSede }).in("id", ids);
-  if (error) throw error;
+  await porLotes(ids, 150, async (parte) => {
+    const { error } = await supabase.from("casos").update({ sede: nuevaSede }).in("id", parte);
+    if (error) throw error;
+  });
 }
 
 export async function agregarComentario(casoId, { texto, autor, cargo, creadoPor }) {

@@ -58,13 +58,35 @@ export async function actualizarRegistro(id, campos) {
   const { error } = await supabase.from("seguimiento_contratos").update(campos).eq("id", id);
   if (error) throw error;
 }
+// Con selecciones grandes, mandar todos los ID en un solo pedido genera una URL
+// gigante que corta la conexion ("Failed to fetch"). Lo partimos en lotes.
+async function porLotes(ids, tam, fn) {
+  for (let i = 0; i < ids.length; i += tam) {
+    const parte = ids.slice(i, i + tam);
+    let intentos = 0;
+    while (true) {
+      try { await fn(parte); break; }
+      catch (err) {
+        intentos++;
+        if (intentos >= 4) throw err;
+        await new Promise((res) => setTimeout(res, 1000 * intentos));
+      }
+    }
+    if (i + tam < ids.length) await new Promise((res) => setTimeout(res, 300));
+  }
+}
+
 export async function eliminarRegistros(ids) {
-  const { error } = await supabase.from("seguimiento_contratos").delete().in("id", ids);
-  if (error) throw error;
+  await porLotes(ids, 150, async (parte) => {
+    const { error } = await supabase.from("seguimiento_contratos").delete().in("id", parte);
+    if (error) throw error;
+  });
 }
 export async function reasignarSedeRegistros(ids, nuevaSede) {
-  const { error } = await supabase.from("seguimiento_contratos").update({ sede: nuevaSede }).in("id", ids);
-  if (error) throw error;
+  await porLotes(ids, 150, async (parte) => {
+    const { error } = await supabase.from("seguimiento_contratos").update({ sede: nuevaSede }).in("id", parte);
+    if (error) throw error;
+  });
 }
 export async function agregarComentarioRegistro(registroId, { texto, autor, cargo, creadoPor }) {
   const { error } = await supabase.from("seguimiento_contratos_comentarios").insert({

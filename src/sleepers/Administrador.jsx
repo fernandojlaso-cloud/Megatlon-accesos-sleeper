@@ -62,6 +62,7 @@ function SegmentoSleepers({ puedeEliminar }) {
   const [seleccionados, setSeleccionados] = useState(new Set());
   const [nuevaSede, setNuevaSede] = useState("");
   const [ediciones, setEdiciones] = useState({});
+  const [procesando, setProcesando] = useState(false);
 
   const sedes = useMemo(() => [...new Set(casos.map((c) => c.sede).filter(Boolean))].sort(), [casos]);
   const filtrados = useMemo(() => casos.filter((c) => {
@@ -88,12 +89,18 @@ function SegmentoSleepers({ puedeEliminar }) {
   async function eliminarSeleccionados() {
     if (!seleccionados.size) return alert("Seleccioná al menos un socio.");
     if (!confirm(`¿Eliminar ${seleccionados.size} socio(s)? No se puede deshacer.`)) return;
-    try { await eliminarCasos([...seleccionados]); setSeleccionados(new Set()); } catch (err) { alert(err.message); }
+    setProcesando(true);
+    try { await eliminarCasos([...seleccionados]); setSeleccionados(new Set()); }
+    catch (err) { alert(err.message); }
+    finally { setProcesando(false); }
   }
   async function reasignarSeleccionados() {
     if (!seleccionados.size) return alert("Seleccioná al menos un socio.");
     if (!nuevaSede.trim()) return alert("Escribí la sede de destino.");
-    try { await reasignarSede([...seleccionados], nuevaSede.trim()); setSeleccionados(new Set()); setNuevaSede(""); } catch (err) { alert(err.message); }
+    setProcesando(true);
+    try { await reasignarSede([...seleccionados], nuevaSede.trim()); setSeleccionados(new Set()); setNuevaSede(""); }
+    catch (err) { alert(err.message); }
+    finally { setProcesando(false); }
   }
 
   return (
@@ -115,8 +122,8 @@ function SegmentoSleepers({ puedeEliminar }) {
       {puedeEliminar && (
         <div style={{ display: "flex", gap: 10, marginBottom: 14, flexWrap: "wrap", alignItems: "center" }}>
           <input style={{ ...inp, maxWidth: 220 }} placeholder="Nueva sede para seleccionados" value={nuevaSede} onChange={(e) => setNuevaSede(e.target.value)} />
-          <button style={btnOut} onClick={reasignarSeleccionados}><IconoPin /> Reasignar sede</button>
-          <button style={{ ...btnOut, color: T.red, borderColor: T.red }} onClick={eliminarSeleccionados}><IconoBasura /> Eliminar seleccionados</button>
+          <button style={btnOut} onClick={reasignarSeleccionados} disabled={procesando}><IconoPin /> {procesando ? "Procesando..." : "Reasignar sede"}</button>
+          <button style={{ ...btnOut, color: T.red, borderColor: T.red }} onClick={eliminarSeleccionados} disabled={procesando}><IconoBasura /> {procesando ? "Procesando..." : "Eliminar seleccionados"}</button>
           <span style={{ fontSize: 11.5, color: T.inkSoft }}>{seleccionados.size > 0 ? `${seleccionados.size} seleccionado(s)` : `${filtrados.length} socio(s) en la lista`}</span>
         </div>
       )}
@@ -179,6 +186,7 @@ function SegmentoContratos({ puedeEliminar }) {
   const [seleccionados, setSeleccionados] = useState(new Set());
   const [nuevaSede, setNuevaSede] = useState("");
   const [ediciones, setEdiciones] = useState({});
+  const [procesando, setProcesando] = useState(false);
 
   const sedes = useMemo(() => [...new Set(registros.map((r) => r.sede).filter(Boolean))].sort(), [registros]);
   const filtrados = useMemo(() => registros.filter((r) => {
@@ -214,12 +222,18 @@ function SegmentoContratos({ puedeEliminar }) {
   async function eliminarSeleccionados() {
     if (!seleccionados.size) return alert("Seleccioná al menos un registro.");
     if (!confirm(`¿Eliminar ${seleccionados.size} registro(s)? No se puede deshacer.`)) return;
-    try { await eliminarRegistros([...seleccionados]); setSeleccionados(new Set()); } catch (err) { alert(err.message); }
+    setProcesando(true);
+    try { await eliminarRegistros([...seleccionados]); setSeleccionados(new Set()); }
+    catch (err) { alert(err.message); }
+    finally { setProcesando(false); }
   }
   async function reasignarSeleccionados() {
     if (!seleccionados.size) return alert("Seleccioná al menos un registro.");
     if (!nuevaSede.trim()) return alert("Escribí la sede de destino.");
-    try { await reasignarSedeRegistros([...seleccionados], nuevaSede.trim()); setSeleccionados(new Set()); setNuevaSede(""); } catch (err) { alert(err.message); }
+    setProcesando(true);
+    try { await reasignarSedeRegistros([...seleccionados], nuevaSede.trim()); setSeleccionados(new Set()); setNuevaSede(""); }
+    catch (err) { alert(err.message); }
+    finally { setProcesando(false); }
   }
 
   return (
@@ -259,8 +273,8 @@ function SegmentoContratos({ puedeEliminar }) {
       {puedeEliminar && (
         <div style={{ display: "flex", gap: 10, marginBottom: 14, flexWrap: "wrap", alignItems: "center" }}>
           <input style={{ ...inp, maxWidth: 220 }} placeholder="Nueva sede para seleccionados" value={nuevaSede} onChange={(e) => setNuevaSede(e.target.value)} />
-          <button style={btnOut} onClick={reasignarSeleccionados}><IconoPin /> Reasignar sede</button>
-          <button style={{ ...btnOut, color: T.red, borderColor: T.red }} onClick={eliminarSeleccionados}><IconoBasura /> Eliminar seleccionados</button>
+          <button style={btnOut} onClick={reasignarSeleccionados} disabled={procesando}><IconoPin /> {procesando ? "Procesando..." : "Reasignar sede"}</button>
+          <button style={{ ...btnOut, color: T.red, borderColor: T.red }} onClick={eliminarSeleccionados} disabled={procesando}><IconoBasura /> {procesando ? "Procesando..." : "Eliminar seleccionados"}</button>
           <span style={{ fontSize: 11.5, color: T.inkSoft }}>{seleccionados.size > 0 ? `${seleccionados.size} seleccionado(s)` : `${filtrados.length} registro(s) en la lista`}</span>
         </div>
       )}
