@@ -173,6 +173,33 @@ export default function Sleepers({ perfil, cargoFirma }) {
     [casosCrudos, comentariosPorCaso]
   );
 
+  // Regla automatica: si pasaron 30 dias desde que se cargo un sleeper y no
+  // volvio a aparecer en una carga mas reciente (misma clave DNI/email/nombre),
+  // asumimos que volvio a entrenar y lo pasamos a Cerrado (Recuperado) solo.
+  useEffect(() => {
+    const porClave = {};
+    casosCrudos.forEach((c) => {
+      const key = norm(c.dni) || norm(c.email) || norm(c.nombre);
+      if (!porClave[key] || c.fecha_carga > porClave[key].fecha_carga) porClave[key] = c;
+    });
+    const hoy = hoyStr();
+    const aCerrar = Object.values(porClave).filter(
+      (c) => c.estado === "Abierto" && c.fecha_carga && diasEntre(c.fecha_carga, hoy) >= 30
+    );
+    if (!aCerrar.length) return;
+    (async () => {
+      for (const c of aCerrar) {
+        try {
+          await actualizarCaso(c.id, { estado: "Cerrado" });
+          await agregarComentario(c.id, {
+            texto: "Cerrado automáticamente: pasaron 30 días desde la carga sin volver a aparecer como sleeper.",
+            autor: "Sistema", cargo: "Automático", creadoPor: perfil.id,
+          });
+        } catch { /* si falla, se vuelve a intentar en la proxima carga de datos */ }
+      }
+    })();
+  }, [casosCrudos]);
+
   const esDireccion = perfil.rol === "director";
   const puedeEditarIdentidad = ["director", "gerente"].includes(perfil.rol);
   const puedeCargar = ["director", "gerente", "gerente_servicio", "coordinador_servicio", "referente_servicio"].includes(perfil.rol);

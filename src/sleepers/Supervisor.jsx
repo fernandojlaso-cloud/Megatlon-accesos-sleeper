@@ -68,6 +68,19 @@ export default function Supervisor() {
     return { total: casos.length, sinGestionar, gestionado, cerrado };
   }, [casos, comentariosCount]);
 
+  const riesgo = useMemo(() => ({
+    alto: casos.filter((c) => c.riesgo === "Alto").length,
+    medio: casos.filter((c) => c.riesgo === "Medio").length,
+    bajo: casos.filter((c) => c.riesgo === "Bajo").length,
+    sinDefinir: casos.filter((c) => !c.riesgo).length,
+  }), [casos]);
+
+  const intencion = useMemo(() => ({
+    si: casos.filter((c) => c.intencion_volver === "Si").length,
+    no: casos.filter((c) => c.intencion_volver === "No").length,
+    sinDefinir: casos.filter((c) => !c.intencion_volver).length,
+  }), [casos]);
+
   // ---------- Contratos a vencer ----------
   const { registros: registrosContratos } = useSeguimientoContratos();
   const contratosEnVentana = useMemo(() => registrosContratos.map((r) => ({ ...r, _clasif: clasificar(r) }))
@@ -116,6 +129,21 @@ export default function Supervisor() {
         <Macro n={macro.sinGestionar} l="Sin gestionar" color={T.red} />
         <Macro n={macro.gestionado} l="Gestionado" color={T.amber} />
         <Macro n={macro.cerrado} l="Cerrado" color={T.green} />
+      </div>
+
+      <p style={sectionTitle}>Nivel de riesgo</p>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))", gap: 14, marginBottom: 34 }}>
+        <Macro n={riesgo.alto} l="Riesgo alto" color={T.red} />
+        <Macro n={riesgo.medio} l="Riesgo medio" color={T.amber} />
+        <Macro n={riesgo.bajo} l="Riesgo bajo" color={T.green} />
+        <Macro n={riesgo.sinDefinir} l="Sin definir" color={T.line} />
+      </div>
+
+      <p style={sectionTitle}>Intención de volver</p>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))", gap: 14, marginBottom: 34 }}>
+        <Macro n={intencion.si} l="Sí" color={T.green} />
+        <Macro n={intencion.no} l="No" color={T.red} />
+        <Macro n={intencion.sinDefinir} l="Sin definir" color={T.line} />
       </div>
 
       <p style={sectionTitle}>Por sucursal</p>
