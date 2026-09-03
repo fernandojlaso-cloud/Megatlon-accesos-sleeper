@@ -95,7 +95,11 @@ export default function Supervisor() {
     const abiertos = contratosEnVentana.filter((r) => r.estado === "Abierto").length;
     const enSeguimiento = contratosEnVentana.filter((r) => r.estado === "Seguimiento").length;
     const cerrados = contratosEnVentana.filter((r) => r.estado === "Cerrado").length;
-    return { total: contratosEnVentana.length, critico, atencion, saludable, incompleto, abiertos, enSeguimiento, cerrados };
+    const renovo = contratosEnVentana.filter((r) => r.resultado_gestion === "Renueva").length;
+    const noRenovo = contratosEnVentana.filter((r) => r.resultado_gestion === "No Renueva").length;
+    const pensando = contratosEnVentana.filter((r) => r.resultado_gestion === "Lo está pensado").length;
+    const sinResultado = contratosEnVentana.filter((r) => !r.resultado_gestion).length;
+    return { total: contratosEnVentana.length, critico, atencion, saludable, incompleto, abiertos, enSeguimiento, cerrados, renovo, noRenovo, pensando, sinResultado };
   }, [contratosEnVentana]);
 
   const contratosPorSede = useMemo(() => {
@@ -203,6 +207,14 @@ export default function Supervisor() {
         <Macro n={macroContratos.abiertos} l="Abiertos" color={T.amber} />
         <Macro n={macroContratos.enSeguimiento} l="En seguimiento" color={T.amber} />
         <Macro n={macroContratos.cerrados} l="Cerrados" color={T.green} />
+      </div>
+
+      <p style={sectionTitle}>Contratos a vencer — resultado de la gestión</p>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))", gap: 14, marginBottom: 22 }}>
+        <Macro n={macroContratos.renovo} l="Renueva" color={T.green} />
+        <Macro n={macroContratos.noRenovo} l="No Renueva" color={T.red} />
+        <Macro n={macroContratos.pensando} l="Lo está pensado" color={T.amber} />
+        <Macro n={macroContratos.sinResultado} l="Sin definir" color={T.line} />
       </div>
 
       <p style={sectionTitle}>Contratos a vencer — por sucursal</p>

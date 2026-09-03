@@ -295,12 +295,13 @@ function SegmentoContratos({ puedeEliminar }) {
               <th style={th}>Calificación</th>
               <th style={th}>Cargado por</th>
               <th style={th}>Estado</th>
+              <th style={th}>Resultado</th>
               {puedeEliminar && <th style={th}></th>}
             </tr>
           </thead>
           <tbody>
             {filtrados.length === 0 && (
-              <tr><td colSpan={13} style={{ padding: 40, textAlign: "center", color: T.inkSoft }}>No hay registros que coincidan.</td></tr>
+              <tr><td colSpan={14} style={{ padding: 40, textAlign: "center", color: T.inkSoft }}>No hay registros que coincidan.</td></tr>
             )}
             {filtrados.map((r) => (
               <tr key={r.id}>
@@ -321,6 +322,7 @@ function SegmentoContratos({ puedeEliminar }) {
                 <td style={td}>{r._clasif.completo ? <Badge tone={r._clasif.score <= 2 ? "red" : r._clasif.score <= 5 ? "amber" : "green"}>{r._clasif.score}/10</Badge> : <Badge tone="gris">—</Badge>}</td>
                 <td style={{ ...td, color: T.inkSoft }}>{r.subido_por || "—"}{r.cargo_subido_por ? " · " + r.cargo_subido_por : ""}</td>
                 <td style={{ ...td, color: T.inkSoft }}><Badge tone={r.estado === "Cerrado" ? "green" : r.estado === "Seguimiento" ? "amber" : "gris"}>{r.estado}</Badge></td>
+                <td style={{ ...td, color: T.inkSoft }}>{r.resultado_gestion ? <Badge tone={r.resultado_gestion === "Renueva" ? "green" : r.resultado_gestion === "No Renueva" ? "red" : "amber"}>{r.resultado_gestion}</Badge> : "—"}</td>
                 {puedeEliminar && <td style={td}><button onClick={() => eliminarUno(r.id)} style={delBtn}><IconoBasura /></button></td>}
               </tr>
             ))}

@@ -101,6 +101,7 @@ export default function ContratosVencer({ perfil, cargoFirma }) {
   const [filtroSede, setFiltroSede] = useState("");
   const [filtroClasif, setFiltroClasif] = useState("");
   const [filtroEstado, setFiltroEstado] = useState("Abierto");
+  const [filtroResultado, setFiltroResultado] = useState("");
   const [busqueda, setBusqueda] = useState("");
   const [filtroAsistDesde, setFiltroAsistDesde] = useState("");
   const [filtroAsistHasta, setFiltroAsistHasta] = useState("");
@@ -122,6 +123,7 @@ export default function ContratosVencer({ perfil, cargoFirma }) {
   const filtrados = useMemo(() => enVentana.filter((r) => {
     if (filtroSede && r.sede !== filtroSede) return false;
     if (filtroEstado && r.estado !== filtroEstado) return false;
+    if (filtroResultado && (filtroResultado === "SinDefinir" ? !!r.resultado_gestion : r.resultado_gestion !== filtroResultado)) return false;
     if (filtroClasif) {
       const s = r._clasif;
       if (filtroClasif === "incompleto" && s.completo) return false;
@@ -136,7 +138,7 @@ export default function ContratosVencer({ perfil, cargoFirma }) {
     const b = norm(busqueda);
     if (b && !(norm(r.nombre).includes(b) || norm(r.dni).includes(b))) return false;
     return true;
-  }), [enVentana, filtroSede, filtroEstado, filtroClasif, busqueda, filtroAsistDesde, filtroAsistHasta, filtroNpsDesde, filtroNpsHasta]);
+  }), [enVentana, filtroSede, filtroEstado, filtroResultado, filtroClasif, busqueda, filtroAsistDesde, filtroAsistHasta, filtroNpsDesde, filtroNpsHasta]);
 
   const stats = useMemo(() => {
     const base = filtrados;
@@ -207,6 +209,9 @@ export default function ContratosVencer({ perfil, cargoFirma }) {
 
   async function cambiarEstado(r, estado) {
     try { await actualizarRegistro(r.id, { estado }); } catch (err) { alert(err.message); }
+  }
+  async function cambiarResultado(r, resultado_gestion) {
+    try { await actualizarRegistro(r.id, { resultado_gestion }); } catch (err) { alert(err.message); }
   }
   function abrirComentarios(r) { setModalComentarios(r); setNuevoComentario(""); recargarComentarios(r.id); }
   async function enviarComentario() {
@@ -393,6 +398,16 @@ export default function ContratosVencer({ perfil, cargoFirma }) {
             <option value="">Todos</option>
           </select>
         </div>
+        <div style={{ minWidth: 190 }}>
+          <label style={lab}>Resultado de gestión</label>
+          <select style={inp} value={filtroResultado} onChange={(e) => setFiltroResultado(e.target.value)}>
+            <option value="">Todos</option>
+            <option value="Renueva">Renueva</option>
+            <option value="No Renueva">No Renueva</option>
+            <option value="Lo está pensado">Lo está pensado</option>
+            <option value="SinDefinir">Sin definir</option>
+          </select>
+        </div>
         <div style={{ flex: 1, minWidth: 200 }}>
           <label style={lab}>Buscar</label>
           <input style={inp} value={busqueda} onChange={(e) => setBusqueda(e.target.value)} placeholder="Nombre o DNI..." />
@@ -536,6 +551,16 @@ export default function ContratosVencer({ perfil, cargoFirma }) {
                   <option value="Abierto">Abierto</option>
                   <option value="Seguimiento">Seguimiento (estamos en contacto)</option>
                   <option value="Cerrado">Cerrado (renovó o se dio de baja)</option>
+                </select>
+
+                <select style={{ ...inp, padding: "6px 8px", fontSize: 11.5, fontWeight: 700, marginTop: 8,
+                  background: r.resultado_gestion === "Renueva" ? T.greenSoft : r.resultado_gestion === "No Renueva" ? T.redSoft : r.resultado_gestion === "Lo está pensado" ? T.amberSoft : T.surface2,
+                  color: r.resultado_gestion === "Renueva" ? T.green : r.resultado_gestion === "No Renueva" ? T.red : r.resultado_gestion === "Lo está pensado" ? T.amber : T.inkSoft }}
+                  value={r.resultado_gestion || ""} onChange={(e) => cambiarResultado(r, e.target.value || null)}>
+                  <option value="">Resultado de la gestión: sin definir</option>
+                  <option value="Renueva">Renueva</option>
+                  <option value="No Renueva">No Renueva</option>
+                  <option value="Lo está pensado">Lo está pensado</option>
                 </select>
               </div>
             );
