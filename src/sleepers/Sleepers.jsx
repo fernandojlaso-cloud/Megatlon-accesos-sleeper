@@ -8,6 +8,7 @@ import {
   IconoCarpeta, IconoFlechaAbajo,
 } from "./iconos.jsx";
 import Evaluacion from "./Evaluacion.jsx";
+import { useMensajesPlantillas, completarPlaceholders } from "./datosPlantillas.js";
 
 const MOTIVOS = ["Falta de tiempo", "Problemas personales", "Mudanza", "Lesión o problema de salud", "Problemas con el servicio", "Vacaciones", "Otro"];
 
@@ -32,7 +33,7 @@ const diasEntre = (desde, hasta) => {
   return Math.round((d2 - d1) / 86400000);
 };
 
-function construirMensaje(nombre, gerente, sede, cargoLabel) {
+function construirMensajeFallback(nombre, gerente, sede, cargoLabel) {
   const first = (nombre || "").trim().split(" ")[0] || nombre || "Hola";
   const g = gerente || "el equipo";
   const s = sede || "tu sede";
@@ -59,6 +60,18 @@ Si te parece, contame cuál es el principal motivo por el que dejaste de asistir
 No se trata de una venta ni de una campaña comercial. Simplemente queremos acompañarte mejor.
 
 Te agradezco mucho el tiempo para responder este mensaje.
+
+${g}
+${cargoLabel || "Gerente"} | Megatlon ${s}`;
+}
+
+function construirMensaje(nombre, gerente, sede, cargoLabel, plantillas) {
+  const g = gerente || "el equipo";
+  const s = sede || "tu sede";
+  const claveDb = plantillas && plantillas["sleepers|general"];
+  if (!claveDb) return construirMensajeFallback(nombre, gerente, sede, cargoLabel);
+  const cuerpo = completarPlaceholders(claveDb, { nombre, gerente: g, cargo: cargoLabel, sede: s });
+  return `${cuerpo}
 
 ${g}
 ${cargoLabel || "Gerente"} | Megatlon ${s}`;
@@ -167,6 +180,12 @@ function mapRow(row, defaults) {
 export default function Sleepers({ perfil, cargoFirma }) {
   const { casos: casosCrudos, comentariosPorCaso, recargarComentarios } = useCasos();
   const { totales, guardar: guardarTotal } = useSociosTotales();
+  const { plantillas: plantillasCrudas } = useMensajesPlantillas();
+  const plantillas = useMemo(() => {
+    const mapa = {};
+    plantillasCrudas.filter((p) => p.activa).forEach((p) => { mapa[`${p.tema}|${p.clave}`] = p.cuerpo; });
+    return mapa;
+  }, [plantillasCrudas]);
 
   const casos = useMemo(
     () => casosCrudos.map((c) => ({ ...c, _numComentarios: (comentariosPorCaso[c.id] || []).length })),
@@ -316,7 +335,7 @@ export default function Sleepers({ perfil, cargoFirma }) {
       sede: r.sede || perfil.sede || "Sin sede",
       ultima_visita: r.ultimaVisita || null,
       fecha_fin_contrato: r.fechaFinContrato || null,
-      mensaje: construirMensaje(r.nombre, perfil.nombre, r.sede || perfil.sede, cargoLabel),
+      mensaje: construirMensaje(r.nombre, perfil.nombre, r.sede || perfil.sede, cargoLabel, plantillas),
       subido_por: perfil.nombre,
       cargo_subido_por: cargoLabel,
       creado_por: perfil.id,
@@ -344,7 +363,7 @@ export default function Sleepers({ perfil, cargoFirma }) {
         sede,
         ultima_visita: manual.ultimaVisita.trim() || null,
         fecha_fin_contrato: manual.finContrato || null,
-        mensaje: construirMensaje(manual.nombre.trim(), perfil.nombre, sede, cargoLabel),
+        mensaje: construirMensaje(manual.nombre.trim(), perfil.nombre, sede, cargoLabel, plantillas),
         subido_por: perfil.nombre,
         cargo_subido_por: cargoLabel,
         creado_por: perfil.id,

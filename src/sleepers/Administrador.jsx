@@ -3,6 +3,7 @@ import { T, FUENTE, inp, lab, btnOut, btnVerde, Badge } from "../estilos.jsx";
 import { useCasos, actualizarCaso, eliminarCasos, reasignarSede } from "./datos.js";
 import { useSeguimientoContratos, actualizarRegistro, eliminarRegistros, reasignarSedeRegistros, clasificar } from "./datosContratos.js";
 import { useBancoPreguntas, crearPregunta, actualizarPregunta, eliminarPregunta } from "./datosPreguntas.js";
+import { useMensajesPlantillas, crearPlantilla, actualizarPlantilla, eliminarPlantilla } from "./datosPlantillas.js";
 import { IconoBasura, IconoPin, IconoCandado, IconoMas } from "./iconos.jsx";
 
 const norm = (s) => (s || "").toString().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
@@ -38,11 +39,13 @@ export default function Administrador({ perfil }) {
         <button onClick={() => setSegmento("sleepers")} style={tabBtn(segmento === "sleepers")}>Sleepers</button>
         <button onClick={() => setSegmento("contratos")} style={tabBtn(segmento === "contratos")}>Contratos a Vencer</button>
         {esDireccion && <button onClick={() => setSegmento("preguntas")} style={tabBtn(segmento === "preguntas")}>Preguntas de evaluación</button>}
+        {esDireccion && <button onClick={() => setSegmento("mensajes")} style={tabBtn(segmento === "mensajes")}>Mensajes a socios</button>}
       </div>
 
       {segmento === "sleepers" && <SegmentoSleepers puedeEliminar={puedeEliminar} />}
       {segmento === "contratos" && <SegmentoContratos puedeEliminar={puedeEliminar} />}
       {segmento === "preguntas" && esDireccion && <SegmentoPreguntas perfil={perfil} />}
+      {segmento === "mensajes" && esDireccion && <SegmentoMensajes perfil={perfil} />}
     </div>
   );
 }
@@ -480,6 +483,137 @@ function SegmentoPreguntas({ perfil }) {
 const s2 = {
   smallBtn: { background: "none", border: "1px solid " + T.line, color: T.ink, fontSize: 11, padding: "5px 9px", borderRadius: 9, cursor: "pointer", fontFamily: FUENTE },
 };
+
+/* ============================================================
+   Segmento Mensajes a socios
+   ============================================================ */
+function SegmentoMensajes({ perfil }) {
+  const { plantillas } = useMensajesPlantillas();
+  const [filtroTema, setFiltroTema] = useState("");
+  const [editando, setEditando] = useState(null); // plantilla completa en edicion, o objeto vacio para nueva
+  const [textoCuerpo, setTextoCuerpo] = useState("");
+
+  const filtradas = useMemo(() => plantillas.filter((p) => !filtroTema || p.tema === filtroTema), [plantillas, filtroTema]);
+
+  function abrirEdicion(p) { setEditando(p); setTextoCuerpo(p.cuerpo); }
+  function abrirNueva() {
+    setEditando({ id: null, tema: filtroTema || "sleepers", clave: "", etiqueta: "", cuerpo: "" });
+    setTextoCuerpo("");
+  }
+  function cerrar() { setEditando(null); setTextoCuerpo(""); }
+
+  async function guardar() {
+    if (!editando.etiqueta.trim() || !editando.clave.trim() || !textoCuerpo.trim()) {
+      alert("Completá clave, etiqueta y el cuerpo del mensaje.");
+      return;
+    }
+    try {
+      if (editando.id) {
+        await actualizarPlantilla(editando.id, { cuerpo: textoCuerpo, etiqueta: editando.etiqueta, tema: editando.tema, clave: editando.clave });
+      } else {
+        await crearPlantilla({ tema: editando.tema, clave: editando.clave, etiqueta: editando.etiqueta, cuerpo: textoCuerpo, actualizadoPor: perfil.id });
+      }
+      cerrar();
+    } catch (err) { alert(err.message); }
+  }
+  async function borrar(id) {
+    if (!confirm("¿Eliminar esta plantilla? Si sigue en uso, el sistema usará un mensaje de respaldo genérico.")) return;
+    try { await eliminarPlantilla(id); if (editando?.id === id) cerrar(); } catch (err) { alert(err.message); }
+  }
+  async function toggleActiva(p) {
+    try { await actualizarPlantilla(p.id, { activa: !p.activa }); } catch (err) { alert(err.message); }
+  }
+
+  return (
+    <div>
+      <p style={{ fontSize: 12.5, color: T.inkSoft, marginBottom: 16 }}>
+        Estos son los mensajes que se sugieren a cada socio, tanto en Sleepers como en Contratos a Vencer, según su
+        clasificación. Podés editarlos en bloque acá — el cambio se aplica al toque a los mensajes nuevos que se
+        generen. Placeholders disponibles: <code style={{ color: T.ink }}>{"{nombre}"}</code>, <code style={{ color: T.ink }}>{"{gerente}"}</code>,{" "}
+        <code style={{ color: T.ink }}>{"{cargo}"}</code>, <code style={{ color: T.ink }}>{"{sede}"}</code>. La firma final se agrega sola después, no hace falta escribirla.
+        Para que el email siga saliendo sin firma final, terminá el mensaje de Sleepers con "Te agradezco mucho el tiempo
+        para responder este mensaje." y los de Contratos a Vencer con "¡Gracias!".
+      </p>
+
+      <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "flex-end", marginBottom: 16 }}>
+        <div style={{ minWidth: 200 }}>
+          <label style={lab}>Perfil</label>
+          <select style={inp} value={filtroTema} onChange={(e) => setFiltroTema(e.target.value)}>
+            <option value="">Todos</option>
+            <option value="sleepers">Sleepers</option>
+            <option value="contratos">Contratos a Vencer</option>
+          </select>
+        </div>
+        <button style={btnVerde} onClick={abrirNueva}><IconoMas /> Agregar mensaje</button>
+        <span style={{ fontSize: 11.5, color: T.inkSoft }}>{filtradas.length} mensaje(s)</span>
+      </div>
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        {filtradas.length === 0 && (
+          <div style={{ padding: 30, textAlign: "center", color: T.inkSoft, background: T.surface, border: "1px solid " + T.line, borderRadius: 16 }}>
+            No hay mensajes cargados para este perfil.
+          </div>
+        )}
+        {filtradas.map((p) => (
+          <div key={p.id} style={{ background: T.surface, border: "1px solid " + T.line, borderRadius: 16, padding: 16, opacity: p.activa ? 1 : 0.55 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10, marginBottom: 8 }}>
+              <div>
+                <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 4 }}>
+                  <Badge tone={p.tema === "sleepers" ? "blue" : "marca"}>{p.tema === "sleepers" ? "Sleepers" : "Contratos a Vencer"}</Badge>
+                  {!p.activa && <Badge tone="gris">Inactiva</Badge>}
+                </div>
+                <p style={{ fontWeight: 700, fontSize: 13 }}>{p.etiqueta}</p>
+                <p style={{ fontSize: 11, color: T.inkSoft }}>Clave: {p.clave}</p>
+              </div>
+              <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                <button style={s2.smallBtn} onClick={() => toggleActiva(p)}>{p.activa ? "Desactivar" : "Activar"}</button>
+                <button style={s2.smallBtn} onClick={() => abrirEdicion(p)}>Editar</button>
+                <button onClick={() => borrar(p.id)} style={delBtn}><IconoBasura /></button>
+              </div>
+            </div>
+            <p style={{ fontSize: 12, color: T.inkSoft, whiteSpace: "pre-wrap", maxHeight: 60, overflow: "hidden" }}>{p.cuerpo}</p>
+          </div>
+        ))}
+      </div>
+
+      {editando && (
+        <div onClick={(e) => { if (e.target === e.currentTarget) cerrar(); }}
+          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.6)", zIndex: 50, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+          <div style={{ background: T.surface, border: "1px solid " + T.line, borderRadius: 16, maxWidth: 560, width: "100%", maxHeight: "85vh", overflowY: "auto", padding: "22px 24px" }}>
+            <h3 style={{ margin: "0 0 4px", fontSize: 15 }}>{editando.id ? editando.etiqueta : "Nuevo mensaje"}</h3>
+            <p style={{ fontSize: 12, color: T.inkSoft, marginBottom: 14 }}>
+              {editando.id
+                ? "Editá el texto y guardá — se va a usar en los próximos mensajes que se generen para esta clasificación."
+                : "Definí el perfil, la clave y el texto. La clave de Contratos a Vencer tiene que ser exactamente Nivel|Segmento (por ejemplo Alta|Promotor) para que el sistema la reconozca."}
+            </p>
+            <div style={{ display: "flex", gap: 10, marginBottom: 10 }}>
+              <div style={{ flex: 1 }}>
+                <label style={lab}>Perfil</label>
+                <select style={inp} value={editando.tema} onChange={(e) => setEditando({ ...editando, tema: e.target.value })}>
+                  <option value="sleepers">Sleepers</option>
+                  <option value="contratos">Contratos a Vencer</option>
+                </select>
+              </div>
+              <div style={{ flex: 1 }}>
+                <label style={lab}>Clave</label>
+                <input style={inp} value={editando.clave} onChange={(e) => setEditando({ ...editando, clave: e.target.value })} placeholder="Ej: Alta|Promotor o general" />
+              </div>
+            </div>
+            <label style={lab}>Etiqueta (nombre para identificarlo)</label>
+            <input style={{ ...inp, marginBottom: 10 }} value={editando.etiqueta} onChange={(e) => setEditando({ ...editando, etiqueta: e.target.value })} />
+            <label style={lab}>Mensaje</label>
+            <textarea style={{ ...inp, resize: "vertical", minHeight: 260, fontFamily: FUENTE, fontSize: 13, lineHeight: 1.6 }}
+              value={textoCuerpo} onChange={(e) => setTextoCuerpo(e.target.value)} />
+            <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
+              <button style={btnVerde} onClick={guardar}>Guardar mensaje</button>
+              <button style={btnOut} onClick={cerrar}>Cancelar</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 const campoEditable = { padding: "6px 8px", fontSize: 12.5, minWidth: 110 };
 const delBtn = { background: "none", border: "none", color: T.inkSoft, cursor: "pointer" };

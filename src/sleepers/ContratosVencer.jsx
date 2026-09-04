@@ -11,6 +11,7 @@ import {
   IconoCarpeta, IconoFlechaAbajo, IconoReloj,
 } from "./iconos.jsx";
 import Evaluacion from "./Evaluacion.jsx";
+import { useMensajesPlantillas } from "./datosPlantillas.js";
 
 const hoyStr = () => new Date().toISOString().slice(0, 10);
 const fmt = (iso) => { if (!iso) return "—"; const [y, m, d] = iso.split("-"); return `${d}/${m}/${y}`; };
@@ -65,6 +66,12 @@ function leerArchivo(file) {
 
 export default function ContratosVencer({ perfil, cargoFirma }) {
   const { registros: crudos, comentariosPorRegistro, recargarComentarios } = useSeguimientoContratos();
+  const { plantillas: plantillasCrudas } = useMensajesPlantillas();
+  const plantillas = useMemo(() => {
+    const mapa = {};
+    plantillasCrudas.filter((p) => p.activa).forEach((p) => { mapa[`${p.tema}|${p.clave}`] = p.cuerpo; });
+    return mapa;
+  }, [plantillasCrudas]);
   const registros = useMemo(() => crudos.map((r) => {
     let clasif = clasificar(r);
     const dias = diasEntre(hoyStr(), r.fecha_fin_contrato);
@@ -226,7 +233,7 @@ export default function ContratosVencer({ perfil, cargoFirma }) {
   function mensajeDe(r) {
     if (r.mensaje) return r.mensaje;
     const dias = diasEntre(hoyStr(), r.fecha_fin_contrato);
-    return construirMensajeContrato(r.nombre, perfil.nombre, r.sede, cargoLabel, dias, r._clasif.nivel, r._clasif.segmento);
+    return construirMensajeContrato(r.nombre, perfil.nombre, r.sede, cargoLabel, dias, r._clasif.nivel, r._clasif.segmento, plantillas);
   }
   async function marcarEnvio(r) {
     const campos = {};

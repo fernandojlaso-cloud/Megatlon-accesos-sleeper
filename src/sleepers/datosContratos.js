@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "../supabase.js";
+import { completarPlaceholders } from "./datosPlantillas.js";
 
 /* ============================================================
    Hook principal con sincronizacion en tiempo real, igual patron
@@ -397,11 +398,13 @@ ${ANCLA_CIERRE}`,
   return CUERPOS[clave] || null;
 }
 
-export function construirMensajeContrato(nombreCompleto, gerente, sede, cargoLabel, dias, nivel, segmento) {
+export function construirMensajeContrato(nombreCompleto, gerente, sede, cargoLabel, dias, nivel, segmento, plantillas) {
   const g = gerente || "el equipo";
   const s = sede || "tu sede";
-  const cuerpo = (nivel && segmento && cuerpoPorClasificacion(nivel, segmento, nombreCompleto))
-    || cuerpoGenerico(nombreCompleto);
+  const claveDb = nivel && segmento && plantillas ? plantillas[`contratos|${nivel}|${segmento}`] : null;
+  const cuerpo = claveDb
+    ? completarPlaceholders(claveDb, { nombre: nombreCompleto, gerente: g, cargo: cargoLabel, sede: s })
+    : ((nivel && segmento && cuerpoPorClasificacion(nivel, segmento, nombreCompleto)) || cuerpoGenerico(nombreCompleto));
   return `${cuerpo}
 
 ${g}
