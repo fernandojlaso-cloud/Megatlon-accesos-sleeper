@@ -274,7 +274,7 @@ export default function ContratosVencer({ perfil, cargoFirma }) {
         </div>
       )}
 
-      {evalAbierta && <Evaluacion onCerrar={() => setEvalAbierta(false)} />}
+      {evalAbierta && <Evaluacion perfil={perfil} onCerrar={() => setEvalAbierta(false)} />}
 
       {puedeCargar && (
         <div style={{ marginBottom: 22 }}>

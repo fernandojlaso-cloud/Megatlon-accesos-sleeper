@@ -474,10 +474,14 @@ export default function Sleepers({ perfil, cargoFirma }) {
           <p>Podés ir agregando todos los comentarios que hagan falta por socio, con fecha y quién lo escribió. El estado (Abierto/Cerrado) marca si el caso sigue en seguimiento o ya se resolvió — cerrar no borra la información, solo deja de aparecer en el filtro "Abiertos" por defecto.</p>
           <p style={{ color: T.ink, fontWeight: 700, margin: "14px 0 6px" }}>Quién puede corregir o eliminar</p>
           <p>Corregir nombre, DNI, email, teléfono o sede: Dirección o Gerente, desde la solapa Administrador. Eliminar un socio: exclusivo de Dirección.</p>
+          <p style={{ color: T.ink, fontWeight: 700, margin: "14px 0 6px" }}>Protocolo de respuesta según el motivo</p>
+          <p><b style={{ color: T.ink }}>Compensar meses por enfermedad o mudanza:</b> siempre se pide el certificado correspondiente — de cambio de domicilio en caso de mudanza, o certificado médico en caso de enfermedad.</p>
+          <p><b style={{ color: T.ink }}>Problemas con el servicio</b> (saturación, falta de máquinas, etc.): siempre se busca presentarle un profesor al socio para que le genere una variante en su plan de entrenamiento.</p>
+          <p><b style={{ color: T.ink }}>Temas de salud:</b> se adapta la actividad y el plan de entrenamiento según la necesidad puntual. Por ejemplo: problemas de articulaciones → ofrecer pileta; necesita rehabilitación → asignar un profesor; rehabilitación cardiopulmonar → generar actividades nuevas acordes.</p>
         </div>
       )}
 
-      {evalAbierta && <Evaluacion onCerrar={() => setEvalAbierta(false)} />}
+      {evalAbierta && <Evaluacion perfil={perfil} onCerrar={() => setEvalAbierta(false)} />}
 
       {puedeCargar && (
         <div style={{ marginBottom: 22 }}>
