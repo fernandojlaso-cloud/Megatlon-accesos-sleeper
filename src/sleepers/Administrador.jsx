@@ -1,8 +1,9 @@
 import { useMemo, useState } from "react";
-import { T, FUENTE, inp, lab, btnOut, Badge } from "../estilos.jsx";
+import { T, FUENTE, inp, lab, btnOut, btnVerde, Badge } from "../estilos.jsx";
 import { useCasos, actualizarCaso, eliminarCasos, reasignarSede } from "./datos.js";
 import { useSeguimientoContratos, actualizarRegistro, eliminarRegistros, reasignarSedeRegistros, clasificar } from "./datosContratos.js";
-import { IconoBasura, IconoPin, IconoCandado } from "./iconos.jsx";
+import { useBancoPreguntas, crearPregunta, actualizarPregunta, eliminarPregunta } from "./datosPreguntas.js";
+import { IconoBasura, IconoPin, IconoCandado, IconoMas } from "./iconos.jsx";
 
 const norm = (s) => (s || "").toString().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
 
@@ -19,6 +20,7 @@ const norm = (s) => (s || "").toString().toLowerCase().normalize("NFD").replace(
 export default function Administrador({ perfil }) {
   const [segmento, setSegmento] = useState("sleepers");
   const puedeEliminar = perfil?.rol === "director";
+  const esDireccion = perfil?.rol === "director";
 
   return (
     <div>
@@ -35,11 +37,12 @@ export default function Administrador({ perfil }) {
       <div style={{ display: "flex", gap: 8, marginBottom: 20, borderBottom: "1px solid " + T.line }}>
         <button onClick={() => setSegmento("sleepers")} style={tabBtn(segmento === "sleepers")}>Sleepers</button>
         <button onClick={() => setSegmento("contratos")} style={tabBtn(segmento === "contratos")}>Contratos a Vencer</button>
+        {esDireccion && <button onClick={() => setSegmento("preguntas")} style={tabBtn(segmento === "preguntas")}>Preguntas de evaluación</button>}
       </div>
 
-      {segmento === "sleepers"
-        ? <SegmentoSleepers puedeEliminar={puedeEliminar} />
-        : <SegmentoContratos puedeEliminar={puedeEliminar} />}
+      {segmento === "sleepers" && <SegmentoSleepers puedeEliminar={puedeEliminar} />}
+      {segmento === "contratos" && <SegmentoContratos puedeEliminar={puedeEliminar} />}
+      {segmento === "preguntas" && esDireccion && <SegmentoPreguntas perfil={perfil} />}
     </div>
   );
 }
@@ -332,6 +335,151 @@ function SegmentoContratos({ puedeEliminar }) {
     </div>
   );
 }
+
+/* ============================================================
+   Segmento Preguntas de evaluación
+   ============================================================ */
+function SegmentoPreguntas({ perfil }) {
+  const { preguntas } = useBancoPreguntas();
+  const [filtroTema, setFiltroTema] = useState("");
+  const [editando, setEditando] = useState(null); // id de la pregunta en edicion, o "nueva"
+  const [form, setForm] = useState(vacio());
+
+  function vacio() {
+    return { tema: "sleepers", prompt: "", opciones: ["", "", "", ""], correcta: 0, explicacion: "", activa: true };
+  }
+
+  const filtradas = useMemo(() => preguntas.filter((p) => !filtroTema || p.tema === filtroTema), [preguntas, filtroTema]);
+
+  function empezarEdicion(p) {
+    setEditando(p.id);
+    setForm({ tema: p.tema, prompt: p.prompt, opciones: [...p.opciones], correcta: p.correcta, explicacion: p.explicacion || "", activa: p.activa });
+  }
+  function empezarNueva() {
+    setEditando("nueva");
+    setForm(vacio());
+  }
+  function cancelar() { setEditando(null); setForm(vacio()); }
+
+  function formValido() {
+    return form.prompt.trim() && form.opciones.every((o) => o.trim());
+  }
+
+  async function guardar() {
+    if (!formValido()) { alert("Completá la pregunta y las 4 opciones."); return; }
+    try {
+      if (editando === "nueva") {
+        await crearPregunta({ ...form, creadoPor: perfil.id });
+      } else {
+        await actualizarPregunta(editando, form);
+      }
+      cancelar();
+    } catch (err) { alert(err.message); }
+  }
+  async function borrar(id) {
+    if (!confirm("¿Eliminar esta pregunta del banco? No se puede deshacer.")) return;
+    try { await eliminarPregunta(id); if (editando === id) cancelar(); } catch (err) { alert(err.message); }
+  }
+  async function toggleActiva(p) {
+    try { await actualizarPregunta(p.id, { activa: !p.activa }); } catch (err) { alert(err.message); }
+  }
+
+  return (
+    <div>
+      <p style={{ fontSize: 12.5, color: T.inkSoft, marginBottom: 16 }}>
+        Estas son las preguntas que se usan en la Evaluación de cada solapa (Sleepers y Contratos a Vencer). Cada intento
+        elige 10 al azar entre las que estén <b style={{ color: T.ink }}>activas</b>. Podés editar, agregar o dar de baja
+        una pregunta sin sacarla del banco (con "Activa" desmarcado deja de salir en la evaluación).
+      </p>
+
+      <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "flex-end", marginBottom: 16 }}>
+        <div style={{ minWidth: 200 }}>
+          <label style={lab}>Perfil</label>
+          <select style={inp} value={filtroTema} onChange={(e) => setFiltroTema(e.target.value)}>
+            <option value="">Todos</option>
+            <option value="sleepers">Sleepers</option>
+            <option value="contratos">Contratos a Vencer</option>
+          </select>
+        </div>
+        <button style={btnVerde} onClick={empezarNueva}><IconoMas /> Agregar pregunta</button>
+        <span style={{ fontSize: 11.5, color: T.inkSoft }}>{filtradas.length} pregunta(s)</span>
+      </div>
+
+      {editando && (
+        <div style={{ background: T.surface2, border: "1px solid " + T.marca, borderRadius: 16, padding: 18, marginBottom: 20 }}>
+          <p style={{ fontWeight: 700, fontSize: 13, marginBottom: 12 }}>{editando === "nueva" ? "Nueva pregunta" : "Editando pregunta"}</p>
+          <div style={{ display: "flex", gap: 12, marginBottom: 10 }}>
+            <div style={{ minWidth: 200 }}>
+              <label style={lab}>Perfil</label>
+              <select style={inp} value={form.tema} onChange={(e) => setForm({ ...form, tema: e.target.value })}>
+                <option value="sleepers">Sleepers</option>
+                <option value="contratos">Contratos a Vencer</option>
+              </select>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 18 }}>
+              <input type="checkbox" checked={form.activa} onChange={(e) => setForm({ ...form, activa: e.target.checked })} id="activa" />
+              <label htmlFor="activa" style={{ fontSize: 12.5 }}>Activa (sale en la evaluación)</label>
+            </div>
+          </div>
+          <label style={lab}>Pregunta</label>
+          <textarea style={{ ...inp, resize: "vertical", minHeight: 50, marginBottom: 10 }} value={form.prompt}
+            onChange={(e) => setForm({ ...form, prompt: e.target.value })} />
+          <label style={lab}>Opciones (marcá cuál es la correcta)</label>
+          {form.opciones.map((op, i) => (
+            <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+              <input type="radio" name="correcta" checked={form.correcta === i} onChange={() => setForm({ ...form, correcta: i })} />
+              <input style={inp} value={op} onChange={(e) => {
+                const nuevas = [...form.opciones]; nuevas[i] = e.target.value; setForm({ ...form, opciones: nuevas });
+              }} placeholder={`Opción ${i + 1}`} />
+            </div>
+          ))}
+          <label style={{ ...lab, marginTop: 6 }}>Explicación (se muestra después de responder)</label>
+          <textarea style={{ ...inp, resize: "vertical", minHeight: 50, marginBottom: 12 }} value={form.explicacion}
+            onChange={(e) => setForm({ ...form, explicacion: e.target.value })} />
+          <div style={{ display: "flex", gap: 8 }}>
+            <button style={btnVerde} onClick={guardar}>Guardar</button>
+            <button style={btnOut} onClick={cancelar}>Cancelar</button>
+          </div>
+        </div>
+      )}
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        {filtradas.length === 0 && (
+          <div style={{ padding: 30, textAlign: "center", color: T.inkSoft, background: T.surface, border: "1px solid " + T.line, borderRadius: 16 }}>
+            No hay preguntas cargadas para este perfil.
+          </div>
+        )}
+        {filtradas.map((p) => (
+          <div key={p.id} style={{ background: T.surface, border: "1px solid " + T.line, borderRadius: 16, padding: 16, opacity: p.activa ? 1 : 0.55 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10, marginBottom: 6 }}>
+              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                <Badge tone={p.tema === "sleepers" ? "blue" : "marca"}>{p.tema === "sleepers" ? "Sleepers" : "Contratos a Vencer"}</Badge>
+                {!p.activa && <Badge tone="gris">Inactiva</Badge>}
+              </div>
+              <div style={{ display: "flex", gap: 6 }}>
+                <button style={s2.smallBtn} onClick={() => toggleActiva(p)}>{p.activa ? "Desactivar" : "Activar"}</button>
+                <button style={s2.smallBtn} onClick={() => empezarEdicion(p)}>Editar</button>
+                <button onClick={() => borrar(p.id)} style={delBtn}><IconoBasura /></button>
+              </div>
+            </div>
+            <p style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>{p.prompt}</p>
+            <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+              {p.opciones.map((op, i) => (
+                <div key={i} style={{ fontSize: 12, color: i === p.correcta ? T.green : T.inkSoft, display: "flex", gap: 6 }}>
+                  {i === p.correcta ? "✓" : "—"} {op}
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+const s2 = {
+  smallBtn: { background: "none", border: "1px solid " + T.line, color: T.ink, fontSize: 11, padding: "5px 9px", borderRadius: 9, cursor: "pointer", fontFamily: FUENTE },
+};
 
 const campoEditable = { padding: "6px 8px", fontSize: 12.5, minWidth: 110 };
 const delBtn = { background: "none", border: "none", color: T.inkSoft, cursor: "pointer" };
