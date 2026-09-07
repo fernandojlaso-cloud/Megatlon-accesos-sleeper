@@ -1,9 +1,9 @@
 import { useMemo, useState } from "react";
 import { T, FUENTE, inp, lab, btnOut, btnVerde, Badge } from "../estilos.jsx";
 import { useCasos, actualizarCaso, eliminarCasos, reasignarSede } from "./datos.js";
-import { useSeguimientoContratos, actualizarRegistro, eliminarRegistros, reasignarSedeRegistros, clasificar } from "./datosContratos.js";
+import { useSeguimientoContratos, actualizarRegistro, eliminarRegistros, reasignarSedeRegistros, clasificar, construirMensajeContrato } from "./datosContratos.js";
 import { useBancoPreguntas, crearPregunta, actualizarPregunta, eliminarPregunta } from "./datosPreguntas.js";
-import { useMensajesPlantillas, crearPlantilla, actualizarPlantilla, eliminarPlantilla } from "./datosPlantillas.js";
+import { useMensajesPlantillas, crearPlantilla, actualizarPlantilla, eliminarPlantilla, construirMensajeSleeper, obtenerPlantillasActivas } from "./datosPlantillas.js";
 import { IconoBasura, IconoPin, IconoCandado, IconoMas } from "./iconos.jsx";
 
 const norm = (s) => (s || "").toString().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
@@ -42,8 +42,8 @@ export default function Administrador({ perfil }) {
         {esDireccion && <button onClick={() => setSegmento("mensajes")} style={tabBtn(segmento === "mensajes")}>Mensajes a socios</button>}
       </div>
 
-      {segmento === "sleepers" && <SegmentoSleepers puedeEliminar={puedeEliminar} />}
-      {segmento === "contratos" && <SegmentoContratos puedeEliminar={puedeEliminar} />}
+      {segmento === "sleepers" && <SegmentoSleepers puedeEliminar={puedeEliminar} perfil={perfil} />}
+      {segmento === "contratos" && <SegmentoContratos puedeEliminar={puedeEliminar} perfil={perfil} />}
       {segmento === "preguntas" && esDireccion && <SegmentoPreguntas perfil={perfil} />}
       {segmento === "mensajes" && esDireccion && <SegmentoMensajes perfil={perfil} />}
     </div>
@@ -61,7 +61,7 @@ function tabBtn(activo) {
 /* ============================================================
    Segmento Sleepers
    ============================================================ */
-function SegmentoSleepers({ puedeEliminar }) {
+function SegmentoSleepers({ puedeEliminar, perfil }) {
   const { casos } = useCasos();
   const [busqueda, setBusqueda] = useState("");
   const [filtroSede, setFiltroSede] = useState("");
@@ -69,6 +69,29 @@ function SegmentoSleepers({ puedeEliminar }) {
   const [nuevaSede, setNuevaSede] = useState("");
   const [ediciones, setEdiciones] = useState({});
   const [procesando, setProcesando] = useState(false);
+  const [progreso, setProgreso] = useState(null);
+
+  async function reaplicarPlantillas() {
+    const abiertos = casos.filter((c) => c.estado === "Abierto");
+    if (!abiertos.length) return alert("No hay socios abiertos para reaplicar.");
+    if (!confirm(`¿Reaplicar la plantilla actual de mensaje a los ${abiertos.length} socios abiertos? Los mensajes que ya estén editados a mano también se van a pisar. No afecta a los que están Cerrados.`)) return;
+    setProcesando(true);
+    try {
+      const mapa = await obtenerPlantillasActivas();
+      for (let i = 0; i < abiertos.length; i++) {
+        const c = abiertos[i];
+        setProgreso({ hecho: i + 1, total: abiertos.length });
+        const nuevoMensaje = construirMensajeSleeper(c.nombre, c.subido_por || perfil?.nombre, c.sede, c.cargo_subido_por, mapa);
+        try { await actualizarCaso(c.id, { mensaje: nuevoMensaje }); } catch { /* seguimos con el resto */ }
+      }
+      alert("Listo, se reaplicó la plantilla a los socios abiertos.");
+    } catch (err) {
+      alert("No se pudo completar: " + err.message);
+    } finally {
+      setProcesando(false);
+      setProgreso(null);
+    }
+  }
 
   const sedes = useMemo(() => [...new Set(casos.map((c) => c.sede).filter(Boolean))].sort(), [casos]);
   const filtrados = useMemo(() => casos.filter((c) => {
@@ -130,6 +153,9 @@ function SegmentoSleepers({ puedeEliminar }) {
           <input style={{ ...inp, maxWidth: 220 }} placeholder="Nueva sede para seleccionados" value={nuevaSede} onChange={(e) => setNuevaSede(e.target.value)} />
           <button style={btnOut} onClick={reasignarSeleccionados} disabled={procesando}><IconoPin /> {procesando ? "Procesando..." : "Reasignar sede"}</button>
           <button style={{ ...btnOut, color: T.red, borderColor: T.red }} onClick={eliminarSeleccionados} disabled={procesando}><IconoBasura /> {procesando ? "Procesando..." : "Eliminar seleccionados"}</button>
+          <button style={btnVerde} onClick={reaplicarPlantillas} disabled={procesando}>
+            {procesando ? (progreso ? `Reaplicando... (${progreso.hecho}/${progreso.total})` : "Reaplicando...") : "Reaplicar plantilla a abiertos"}
+          </button>
           <span style={{ fontSize: 11.5, color: T.inkSoft }}>{seleccionados.size > 0 ? `${seleccionados.size} seleccionado(s)` : `${filtrados.length} socio(s) en la lista`}</span>
         </div>
       )}
@@ -181,7 +207,7 @@ function SegmentoSleepers({ puedeEliminar }) {
 /* ============================================================
    Segmento Contratos a Vencer
    ============================================================ */
-function SegmentoContratos({ puedeEliminar }) {
+function SegmentoContratos({ puedeEliminar, perfil }) {
   const { registros: crudos } = useSeguimientoContratos();
   const registros = useMemo(() => crudos.map((r) => ({ ...r, _clasif: clasificar(r) })), [crudos]);
   const [busqueda, setBusqueda] = useState("");
@@ -193,6 +219,29 @@ function SegmentoContratos({ puedeEliminar }) {
   const [nuevaSede, setNuevaSede] = useState("");
   const [ediciones, setEdiciones] = useState({});
   const [procesando, setProcesando] = useState(false);
+  const [progreso, setProgreso] = useState(null);
+
+  async function reaplicarPlantillas() {
+    const abiertos = registros.filter((r) => r.estado === "Abierto");
+    if (!abiertos.length) return alert("No hay registros abiertos para reaplicar.");
+    if (!confirm(`¿Reaplicar la plantilla actual de mensaje a los ${abiertos.length} registros abiertos? Los mensajes que ya estén editados a mano también se van a pisar. No afecta a Seguimiento ni Cerrados.`)) return;
+    setProcesando(true);
+    try {
+      const mapa = await obtenerPlantillasActivas();
+      for (let i = 0; i < abiertos.length; i++) {
+        const r = abiertos[i];
+        setProgreso({ hecho: i + 1, total: abiertos.length });
+        const nuevoMensaje = construirMensajeContrato(r.nombre, r.subido_por || perfil?.nombre, r.sede, r.cargo_subido_por, null, r._clasif.nivel, r._clasif.segmento, mapa);
+        try { await actualizarRegistro(r.id, { mensaje: nuevoMensaje }); } catch { /* seguimos con el resto */ }
+      }
+      alert("Listo, se reaplicó la plantilla a los registros abiertos.");
+    } catch (err) {
+      alert("No se pudo completar: " + err.message);
+    } finally {
+      setProcesando(false);
+      setProgreso(null);
+    }
+  }
 
   const sedes = useMemo(() => [...new Set(registros.map((r) => r.sede).filter(Boolean))].sort(), [registros]);
   const filtrados = useMemo(() => registros.filter((r) => {
@@ -281,6 +330,9 @@ function SegmentoContratos({ puedeEliminar }) {
           <input style={{ ...inp, maxWidth: 220 }} placeholder="Nueva sede para seleccionados" value={nuevaSede} onChange={(e) => setNuevaSede(e.target.value)} />
           <button style={btnOut} onClick={reasignarSeleccionados} disabled={procesando}><IconoPin /> {procesando ? "Procesando..." : "Reasignar sede"}</button>
           <button style={{ ...btnOut, color: T.red, borderColor: T.red }} onClick={eliminarSeleccionados} disabled={procesando}><IconoBasura /> {procesando ? "Procesando..." : "Eliminar seleccionados"}</button>
+          <button style={btnVerde} onClick={reaplicarPlantillas} disabled={procesando}>
+            {procesando ? (progreso ? `Reaplicando... (${progreso.hecho}/${progreso.total})` : "Reaplicando...") : "Reaplicar plantilla a abiertos"}
+          </button>
           <span style={{ fontSize: 11.5, color: T.inkSoft }}>{seleccionados.size > 0 ? `${seleccionados.size} seleccionado(s)` : `${filtrados.length} registro(s) en la lista`}</span>
         </div>
       )}

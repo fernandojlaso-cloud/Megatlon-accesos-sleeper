@@ -68,3 +68,47 @@ export function completarPlaceholders(texto, { nombre, gerente, cargo, sede }) {
     .replaceAll("{cargo}", cargo || "Gerente")
     .replaceAll("{sede}", sede || "tu sede");
 }
+
+function construirMensajeFallback(nombre, gerente, sede, cargoLabel) {
+  const first = (nombre || "").trim().split(" ")[0] || nombre || "Hola";
+  const g = gerente || "el equipo";
+  const s = sede || "tu sede";
+  const cRol = (cargoLabel || "Gerente").toLowerCase();
+  return `Hola ${first},
+
+Espero que estés muy bien.
+
+Soy ${g}, ${cRol} de Megatlon ${s}.
+
+Te escribo porque hace un tiempo que no te vemos entrenando y quería contactarme personalmente para saber cómo estás.
+
+Más allá del gimnasio, entendemos que cada persona atraviesa momentos, cambios de rutina, temas laborales, familiares o de salud que pueden hacer difícil mantener la actividad física. Por eso me gustaría conocer tu situación y ver si hay algo en lo que podamos ayudarte.
+
+Si te parece, contame cuál es el principal motivo por el que dejaste de asistir:
+
+• Falta de tiempo.
+• Lesión o tema de salud.
+• Situaciones personales o familiares.
+• Cambio de domicilio o lugar de trabajo.
+• Algún aspecto de tu experiencia en el gimnasio que no haya cumplido tus expectativas.
+• Otro motivo.
+
+No se trata de una venta ni de una campaña comercial. Simplemente queremos acompañarte mejor.
+
+Te agradezco mucho el tiempo para responder este mensaje.
+
+${g}
+${cargoLabel || "Gerente"} | Megatlon ${s}`;
+}
+
+export function construirMensajeSleeper(nombre, gerente, sede, cargoLabel, plantillas) {
+  const g = gerente || "el equipo";
+  const s = sede || "tu sede";
+  const claveDb = plantillas && plantillas["sleepers|general"];
+  if (!claveDb) return construirMensajeFallback(nombre, gerente, sede, cargoLabel);
+  const cuerpo = completarPlaceholders(claveDb, { nombre, gerente: g, cargo: cargoLabel, sede: s });
+  return `${cuerpo}
+
+${g}
+${cargoLabel || "Gerente"} | Megatlon ${s}`;
+}

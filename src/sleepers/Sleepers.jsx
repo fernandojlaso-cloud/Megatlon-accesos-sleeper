@@ -8,7 +8,7 @@ import {
   IconoCarpeta, IconoFlechaAbajo,
 } from "./iconos.jsx";
 import Evaluacion from "./Evaluacion.jsx";
-import { useMensajesPlantillas, completarPlaceholders } from "./datosPlantillas.js";
+import { useMensajesPlantillas, construirMensajeSleeper } from "./datosPlantillas.js";
 
 const MOTIVOS = ["Falta de tiempo", "Problemas personales", "Mudanza", "Lesión o problema de salud", "Problemas con el servicio", "Vacaciones", "Otro"];
 
@@ -32,50 +32,6 @@ const diasEntre = (desde, hasta) => {
   const d2 = new Date((hasta || hoyStr()) + "T00:00:00");
   return Math.round((d2 - d1) / 86400000);
 };
-
-function construirMensajeFallback(nombre, gerente, sede, cargoLabel) {
-  const first = (nombre || "").trim().split(" ")[0] || nombre || "Hola";
-  const g = gerente || "el equipo";
-  const s = sede || "tu sede";
-  const cRol = (cargoLabel || "Gerente").toLowerCase();
-  return `Hola ${first},
-
-Espero que estés muy bien.
-
-Soy ${g}, ${cRol} de Megatlon ${s}.
-
-Te escribo porque hace un tiempo que no te vemos entrenando y quería contactarme personalmente para saber cómo estás.
-
-Más allá del gimnasio, entendemos que cada persona atraviesa momentos, cambios de rutina, temas laborales, familiares o de salud que pueden hacer difícil mantener la actividad física. Por eso me gustaría conocer tu situación y ver si hay algo en lo que podamos ayudarte.
-
-Si te parece, contame cuál es el principal motivo por el que dejaste de asistir:
-
-• Falta de tiempo.
-• Lesión o tema de salud.
-• Situaciones personales o familiares.
-• Cambio de domicilio o lugar de trabajo.
-• Algún aspecto de tu experiencia en el gimnasio que no haya cumplido tus expectativas.
-• Otro motivo.
-
-No se trata de una venta ni de una campaña comercial. Simplemente queremos acompañarte mejor.
-
-Te agradezco mucho el tiempo para responder este mensaje.
-
-${g}
-${cargoLabel || "Gerente"} | Megatlon ${s}`;
-}
-
-function construirMensaje(nombre, gerente, sede, cargoLabel, plantillas) {
-  const g = gerente || "el equipo";
-  const s = sede || "tu sede";
-  const claveDb = plantillas && plantillas["sleepers|general"];
-  if (!claveDb) return construirMensajeFallback(nombre, gerente, sede, cargoLabel);
-  const cuerpo = completarPlaceholders(claveDb, { nombre, gerente: g, cargo: cargoLabel, sede: s });
-  return `${cuerpo}
-
-${g}
-${cargoLabel || "Gerente"} | Megatlon ${s}`;
-}
 
 function waLink(telefono, msg) { return "https://wa.me/" + telefono + "?text=" + encodeURIComponent(msg); }
 
@@ -335,7 +291,7 @@ export default function Sleepers({ perfil, cargoFirma }) {
       sede: r.sede || perfil.sede || "Sin sede",
       ultima_visita: r.ultimaVisita || null,
       fecha_fin_contrato: r.fechaFinContrato || null,
-      mensaje: construirMensaje(r.nombre, perfil.nombre, r.sede || perfil.sede, cargoLabel, plantillas),
+      mensaje: construirMensajeSleeper(r.nombre, perfil.nombre, r.sede || perfil.sede, cargoLabel, plantillas),
       subido_por: perfil.nombre,
       cargo_subido_por: cargoLabel,
       creado_por: perfil.id,
@@ -363,7 +319,7 @@ export default function Sleepers({ perfil, cargoFirma }) {
         sede,
         ultima_visita: manual.ultimaVisita.trim() || null,
         fecha_fin_contrato: manual.finContrato || null,
-        mensaje: construirMensaje(manual.nombre.trim(), perfil.nombre, sede, cargoLabel, plantillas),
+        mensaje: construirMensajeSleeper(manual.nombre.trim(), perfil.nombre, sede, cargoLabel, plantillas),
         subido_por: perfil.nombre,
         cargo_subido_por: cargoLabel,
         creado_por: perfil.id,
