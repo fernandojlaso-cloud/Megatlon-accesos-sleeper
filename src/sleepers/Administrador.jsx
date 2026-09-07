@@ -72,9 +72,10 @@ function SegmentoSleepers({ puedeEliminar, perfil }) {
   const [progreso, setProgreso] = useState(null);
 
   async function reaplicarPlantillas() {
-    const abiertos = casos.filter((c) => c.estado === "Abierto");
+    const abiertos = filtrados.filter((c) => c.estado === "Abierto");
     if (!abiertos.length) return alert("No hay socios abiertos para reaplicar.");
-    if (!confirm(`¿Reaplicar la plantilla actual de mensaje a los ${abiertos.length} socios abiertos? Los mensajes que ya estén editados a mano también se van a pisar. No afecta a los que están Cerrados.`)) return;
+    const conFiltro = filtroSede || busqueda;
+    if (!confirm(`¿Reaplicar la plantilla actual de mensaje a los ${abiertos.length} socios abiertos${conFiltro ? " (según el filtro actual)" : " (todas las sedes, sin filtro aplicado)"}? Los mensajes que ya estén editados a mano también se van a pisar. No afecta a los que están Cerrados.`)) return;
     setProcesando(true);
     try {
       const mapa = await obtenerPlantillasActivas();
@@ -222,9 +223,10 @@ function SegmentoContratos({ puedeEliminar, perfil }) {
   const [progreso, setProgreso] = useState(null);
 
   async function reaplicarPlantillas() {
-    const abiertos = registros.filter((r) => r.estado === "Abierto");
+    const abiertos = filtrados.filter((r) => r.estado === "Abierto");
     if (!abiertos.length) return alert("No hay registros abiertos para reaplicar.");
-    if (!confirm(`¿Reaplicar la plantilla actual de mensaje a los ${abiertos.length} registros abiertos? Los mensajes que ya estén editados a mano también se van a pisar. No afecta a Seguimiento ni Cerrados.`)) return;
+    const conFiltro = filtroSede || filtroClasif || filtroVenceDesde || filtroVenceHasta || busqueda;
+    if (!confirm(`¿Reaplicar la plantilla actual de mensaje a los ${abiertos.length} registros abiertos${conFiltro ? " (según el filtro actual)" : " (todas las sedes, sin filtro aplicado)"}? Los mensajes que ya estén editados a mano también se van a pisar. No afecta a Seguimiento ni Cerrados.`)) return;
     setProcesando(true);
     try {
       const mapa = await obtenerPlantillasActivas();
