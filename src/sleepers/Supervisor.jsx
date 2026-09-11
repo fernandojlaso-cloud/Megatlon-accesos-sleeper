@@ -27,8 +27,9 @@ const diasEntre = (desde, hasta) => {
    - Cerrado: el caso esta Cerrado (recuperado o dado de baja).
    ============================================================ */
 export default function Supervisor() {
-  const { casos } = useCasos();
+  const { casos: casosCrudos } = useCasos();
   const [comentariosCount, setComentariosCount] = useState({});
+  const [filtroSede, setFiltroSede] = useState("");
 
   useEffect(() => {
     supabase.from("comentarios").select("caso_id").then(({ data, error }) => {
@@ -37,7 +38,7 @@ export default function Supervisor() {
       (data || []).forEach((c) => { m[c.caso_id] = (m[c.caso_id] || 0) + 1; });
       setComentariosCount(m);
     });
-  }, [casos.length]);
+  }, [casosCrudos.length]);
 
   function estadoGestion(c) {
     if (c.estado === "Cerrado") return "cerrado";
@@ -45,10 +46,13 @@ export default function Supervisor() {
     return tuvoInteraccion ? "gestionado" : "sin_gestionar";
   }
 
+  const sedesDisponibles = useMemo(() => [...new Set(casosCrudos.map((c) => c.sede).filter(Boolean))].sort(), [casosCrudos]);
+  const casos = useMemo(() => filtroSede ? casosCrudos.filter((c) => c.sede === filtroSede) : casosCrudos, [casosCrudos, filtroSede]);
+
   const porSede = useMemo(() => {
-    const sedes = [...new Set(casos.map((c) => c.sede).filter(Boolean))].sort();
+    const sedes = [...new Set(casosCrudos.map((c) => c.sede).filter(Boolean))].sort();
     return sedes.map((sede) => {
-      const lista = casos.filter((c) => c.sede === sede);
+      const lista = casosCrudos.filter((c) => c.sede === sede);
       const sinGestionar = lista.filter((c) => estadoGestion(c) === "sin_gestionar").length;
       const gestionado = lista.filter((c) => estadoGestion(c) === "gestionado").length;
       const cerrado = lista.filter((c) => estadoGestion(c) === "cerrado").length;
@@ -59,7 +63,7 @@ export default function Supervisor() {
         pctCerrado: total ? Math.round((cerrado / total) * 100) : 0,
       };
     });
-  }, [casos, comentariosCount]);
+  }, [casosCrudos, comentariosCount]);
 
   const macro = useMemo(() => {
     const sinGestionar = casos.filter((c) => estadoGestion(c) === "sin_gestionar").length;
@@ -68,18 +72,34 @@ export default function Supervisor() {
     return { total: casos.length, sinGestionar, gestionado, cerrado };
   }, [casos, comentariosCount]);
 
-  const riesgo = useMemo(() => ({
-    alto: casos.filter((c) => c.riesgo === "Alto").length,
-    medio: casos.filter((c) => c.riesgo === "Medio").length,
-    bajo: casos.filter((c) => c.riesgo === "Bajo").length,
-    sinDefinir: casos.filter((c) => !c.riesgo).length,
-  }), [casos]);
-
-  const intencion = useMemo(() => ({
-    si: casos.filter((c) => c.intencion_volver === "Si").length,
-    no: casos.filter((c) => c.intencion_volver === "No").length,
-    sinDefinir: casos.filter((c) => !c.intencion_volver).length,
-  }), [casos]);
+  // Cruce de riesgo e intencion de volver, DENTRO de Gestionados y Cerrados
+  // (no aparte) — con cantidad y % sobre el total de ese grupo.
+  const cruce = useMemo(() => {
+    function calc(lista) {
+      const total = lista.length;
+      const div = total || 1;
+      const riesgo = {
+        alto: lista.filter((c) => c.riesgo === "Alto").length,
+        medio: lista.filter((c) => c.riesgo === "Medio").length,
+        bajo: lista.filter((c) => c.riesgo === "Bajo").length,
+      };
+      const vuelve = {
+        si: lista.filter((c) => c.intencion_volver === "Si").length,
+        no: lista.filter((c) => c.intencion_volver === "No").length,
+        sd: lista.filter((c) => !c.intencion_volver).length,
+      };
+      return {
+        total,
+        riesgo: { alto: riesgo.alto, medio: riesgo.medio, bajo: riesgo.bajo },
+        vuelve: { si: vuelve.si, no: vuelve.no, sd: vuelve.sd },
+        pct: (n) => Math.round((n / div) * 100),
+      };
+    }
+    return {
+      gestionados: calc(casos.filter((c) => estadoGestion(c) === "gestionado")),
+      cerrados: calc(casos.filter((c) => estadoGestion(c) === "cerrado")),
+    };
+  }, [casos, comentariosCount]);
 
   // ---------- Contratos a vencer ----------
   const { registros: registrosContratos } = useSeguimientoContratos();
@@ -123,33 +143,65 @@ export default function Supervisor() {
   return (
     <div>
       <div style={{ fontSize: 15, fontWeight: 800, textTransform: "uppercase", letterSpacing: "-.01em", marginBottom: 6 }}>Panorama general</div>
-      <p style={{ fontSize: 12.5, color: T.inkSoft, marginBottom: 22 }}>
-        Vista de solo lectura de todas las sedes. "Sin gestionar" son socios abiertos a los que
-        todavía nadie contactó ni les registró motivo, riesgo o seguimiento.
+      <p style={{ fontSize: 12.5, color: T.inkSoft, marginBottom: 16 }}>
+        "Sin gestionar" son socios abiertos a los que todavía nadie contactó ni les registró motivo, riesgo o seguimiento.
       </p>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))", gap: 14, marginBottom: 34 }}>
+      <div style={{ marginBottom: 22 }}>
+        <label style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: ".04em", color: T.inkSoft, display: "block", marginBottom: 4 }}>Sede</label>
+        <select value={filtroSede} onChange={(e) => setFiltroSede(e.target.value)}
+          style={{ background: T.surface, border: "1px solid " + T.line, color: T.ink, fontSize: 13, padding: "8px 12px", borderRadius: 11, fontFamily: FUENTE, minWidth: 200 }}>
+          <option value="">Todas las sedes</option>
+          {sedesDisponibles.map((s) => <option key={s} value={s}>{s}</option>)}
+        </select>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))", gap: 14, marginBottom: 30 }}>
         <Macro n={macro.total} l="Total de socios" color={T.marca} />
         <Macro n={macro.sinGestionar} l="Sin gestionar" color={T.red} />
         <Macro n={macro.gestionado} l="Gestionado" color={T.amber} />
         <Macro n={macro.cerrado} l="Cerrado" color={T.green} />
       </div>
 
-      <p style={sectionTitle}>Nivel de riesgo</p>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))", gap: 14, marginBottom: 34 }}>
-        <Macro n={riesgo.alto} l="Riesgo alto" color={T.red} />
-        <Macro n={riesgo.medio} l="Riesgo medio" color={T.amber} />
-        <Macro n={riesgo.bajo} l="Riesgo bajo" color={T.green} />
-        <Macro n={riesgo.sinDefinir} l="Sin definir" color={T.line} />
+      <p style={sectionTitle}>Riesgo e intención de volver — {filtroSede || "todas las sedes"}</p>
+      <div style={{ background: T.surface, border: "1px solid " + T.line, borderRadius: 16, overflowX: "auto", marginBottom: 34 }}>
+        <table style={{ width: "100%", fontSize: 13, borderCollapse: "collapse" }}>
+          <thead>
+            <tr>
+              <th style={th}></th>
+              <th style={{ ...th, color: T.red }}>Riesgo alto</th>
+              <th style={{ ...th, color: T.amber }}>Riesgo medio</th>
+              <th style={{ ...th, color: T.green }}>Riesgo bajo</th>
+              <th style={{ ...th, color: T.green }}>Vuelve: sí</th>
+              <th style={{ ...th, color: T.red }}>Vuelve: no</th>
+              <th style={th}>Sin definir</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td style={{ ...td, fontWeight: 700 }}>Gestionados ({cruce.gestionados.total})</td>
+              <td style={td}><span style={{ color: T.red, fontWeight: 700 }}>{cruce.gestionados.riesgo.alto}</span> <span style={{ color: T.inkSoft }}>({cruce.gestionados.pct(cruce.gestionados.riesgo.alto)}%)</span></td>
+              <td style={td}><span style={{ color: T.amber, fontWeight: 700 }}>{cruce.gestionados.riesgo.medio}</span> <span style={{ color: T.inkSoft }}>({cruce.gestionados.pct(cruce.gestionados.riesgo.medio)}%)</span></td>
+              <td style={td}><span style={{ color: T.green, fontWeight: 700 }}>{cruce.gestionados.riesgo.bajo}</span> <span style={{ color: T.inkSoft }}>({cruce.gestionados.pct(cruce.gestionados.riesgo.bajo)}%)</span></td>
+              <td style={td}><span style={{ color: T.green, fontWeight: 700 }}>{cruce.gestionados.vuelve.si}</span> <span style={{ color: T.inkSoft }}>({cruce.gestionados.pct(cruce.gestionados.vuelve.si)}%)</span></td>
+              <td style={td}><span style={{ color: T.red, fontWeight: 700 }}>{cruce.gestionados.vuelve.no}</span> <span style={{ color: T.inkSoft }}>({cruce.gestionados.pct(cruce.gestionados.vuelve.no)}%)</span></td>
+              <td style={{ ...td, color: T.inkSoft }}>{cruce.gestionados.vuelve.sd} ({cruce.gestionados.pct(cruce.gestionados.vuelve.sd)}%)</td>
+            </tr>
+            <tr>
+              <td style={{ ...td, fontWeight: 700 }}>Cerrados ({cruce.cerrados.total})</td>
+              <td style={td}><span style={{ color: T.red, fontWeight: 700 }}>{cruce.cerrados.riesgo.alto}</span> <span style={{ color: T.inkSoft }}>({cruce.cerrados.pct(cruce.cerrados.riesgo.alto)}%)</span></td>
+              <td style={td}><span style={{ color: T.amber, fontWeight: 700 }}>{cruce.cerrados.riesgo.medio}</span> <span style={{ color: T.inkSoft }}>({cruce.cerrados.pct(cruce.cerrados.riesgo.medio)}%)</span></td>
+              <td style={td}><span style={{ color: T.green, fontWeight: 700 }}>{cruce.cerrados.riesgo.bajo}</span> <span style={{ color: T.inkSoft }}>({cruce.cerrados.pct(cruce.cerrados.riesgo.bajo)}%)</span></td>
+              <td style={td}><span style={{ color: T.green, fontWeight: 700 }}>{cruce.cerrados.vuelve.si}</span> <span style={{ color: T.inkSoft }}>({cruce.cerrados.pct(cruce.cerrados.vuelve.si)}%)</span></td>
+              <td style={td}><span style={{ color: T.red, fontWeight: 700 }}>{cruce.cerrados.vuelve.no}</span> <span style={{ color: T.inkSoft }}>({cruce.cerrados.pct(cruce.cerrados.vuelve.no)}%)</span></td>
+              <td style={{ ...td, color: T.inkSoft }}>{cruce.cerrados.vuelve.sd} ({cruce.cerrados.pct(cruce.cerrados.vuelve.sd)}%)</td>
+            </tr>
+          </tbody>
+        </table>
       </div>
 
-      <p style={sectionTitle}>Intención de volver</p>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))", gap: 14, marginBottom: 34 }}>
-        <Macro n={intencion.si} l="Sí" color={T.green} />
-        <Macro n={intencion.no} l="No" color={T.red} />
-        <Macro n={intencion.sinDefinir} l="Sin definir" color={T.line} />
-      </div>
-
+      {!filtroSede && (
+      <>
       <p style={sectionTitle}>Por sucursal</p>
       <div style={{ background: T.surface, border: "1px solid " + T.line, borderRadius: 16, overflowX: "auto" }}>
         <table style={{ width: "100%", fontSize: 13, borderCollapse: "collapse" }}>
@@ -195,6 +247,8 @@ export default function Supervisor() {
           )}
         </table>
       </div>
+      </>
+      )}
 
       <p style={{ ...sectionTitle, marginTop: 34 }}>Contratos a vencer (ventana 91-150 días)</p>
       <p style={{ fontSize: 11.5, color: T.inkSoft, marginTop: -6, marginBottom: 14 }}>La asistencia es de los últimos 2 meses. El NPS es histórico (última respuesta del socio, sin importar hace cuánto).</p>
