@@ -101,11 +101,11 @@ ${g}
 ${cargoLabel || "Gerente"} | Megatlon ${s}`;
 }
 
-export function construirMensajeSleeper(nombre, gerente, sede, cargoLabel, plantillas) {
+export function construirMensajeSleeper(nombre, gerente, sede, cargoLabel, plantillas, clave = "general") {
   const g = gerente || "el equipo";
   const s = sede || "tu sede";
-  const claveDb = plantillas && plantillas["sleepers|general"];
-  if (!claveDb) return construirMensajeFallback(nombre, gerente, sede, cargoLabel);
+  const claveDb = plantillas && plantillas[`sleepers|${clave}`];
+  if (!claveDb) return clave === "general" ? construirMensajeFallback(nombre, gerente, sede, cargoLabel) : "";
   const cuerpo = completarPlaceholders(claveDb, { nombre, gerente: g, cargo: cargoLabel, sede: s });
   return `${cuerpo}
 

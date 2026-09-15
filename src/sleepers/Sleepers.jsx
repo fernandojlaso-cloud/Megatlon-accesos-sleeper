@@ -209,6 +209,8 @@ export default function Sleepers({ perfil, cargoFirma }) {
   const [filtroCargaHasta, setFiltroCargaHasta] = useState("");
   const [filtroEnvio, setFiltroEnvio] = useState("");
   const [modalMensaje, setModalMensaje] = useState(null);
+  const [textoModalMensaje, setTextoModalMensaje] = useState("");
+  const [numMensajePorCaso, setNumMensajePorCaso] = useState({});
   const [modalComentarios, setModalComentarios] = useState(null);
   const [nuevoComentario, setNuevoComentario] = useState("");
   const [pendientes, setPendientes] = useState([]);
@@ -362,8 +364,44 @@ export default function Sleepers({ perfil, cargoFirma }) {
   async function cambiarCampo(id, campos) {
     try { await actualizarCaso(id, campos); } catch (err) { alert("No se pudo guardar: " + err.message); }
   }
+  function numMensajeDe(c) {
+    return numMensajePorCaso[c.id] ?? (c.fecha_envio_mensaje && !c.fecha_envio_mensaje_2 ? 2 : 1);
+  }
+  function elegirNumMensaje(c, n) {
+    setNumMensajePorCaso((prev) => ({ ...prev, [c.id]: n }));
+  }
+  function mensajeActivoDe(c) {
+    const n = numMensajeDe(c);
+    if (n === 1) {
+      return c.mensaje || construirMensajeSleeper(c.nombre, c.subido_por || perfil.nombre, c.sede, c.cargo_subido_por || cargoLabel, plantillas, "general");
+    }
+    return c.mensaje_2 || construirMensajeSleeper(c.nombre, c.subido_por || perfil.nombre, c.sede, c.cargo_subido_por || cargoLabel, plantillas, "seguimiento");
+  }
   async function marcarEnvio(c) {
-    if (!c.fecha_envio_mensaje) await cambiarCampo(c.id, { fecha_envio_mensaje: hoyStr() });
+    const n = numMensajeDe(c);
+    if (n === 1) {
+      const campos = {};
+      if (!c.mensaje) campos.mensaje = mensajeActivoDe(c);
+      if (!c.fecha_envio_mensaje) campos.fecha_envio_mensaje = hoyStr();
+      if (Object.keys(campos).length) await cambiarCampo(c.id, campos);
+    } else {
+      const campos = {};
+      if (!c.mensaje_2) campos.mensaje_2 = mensajeActivoDe(c);
+      if (!c.fecha_envio_mensaje_2) campos.fecha_envio_mensaje_2 = hoyStr();
+      if (Object.keys(campos).length) await cambiarCampo(c.id, campos);
+    }
+  }
+  function abrirMensaje(c) {
+    setModalMensaje(c);
+    setTextoModalMensaje(mensajeActivoDe(c));
+  }
+  async function guardarMensaje() {
+    if (!modalMensaje) return;
+    const n = numMensajeDe(modalMensaje);
+    try {
+      await cambiarCampo(modalMensaje.id, n === 1 ? { mensaje: textoModalMensaje } : { mensaje_2: textoModalMensaje });
+      setModalMensaje(null);
+    } catch (err) { alert(err.message); }
   }
   function abrirComentarios(c) {
     setModalComentarios(c);
@@ -550,16 +588,31 @@ export default function Sleepers({ perfil, cargoFirma }) {
         sedesDisponibles={sedesDisponibles} conteoClave={conteoClave}
         esDireccion={esDireccion} puedeEditarIdentidad={puedeEditarIdentidad}
         comparativa={comparativa} mejorRecup={mejorRecup} totales={totales} guardarTotal={guardarTotal}
-        onVerMensaje={(c) => setModalMensaje(c)}
+        onVerMensaje={abrirMensaje}
         onComentarios={abrirComentarios}
         onCambiarCampo={cambiarCampo}
         onMarcarEnvio={marcarEnvio}
+        numMensajeDe={numMensajeDe}
+        elegirNumMensaje={elegirNumMensaje}
+        mensajeActivoDe={mensajeActivoDe}
       />
 
       {modalMensaje && (
-        <Modal onClose={() => setModalMensaje(null)} titulo={modalMensaje.nombre} subtitulo="Mensaje que se envía por WhatsApp o email">
-          <pre style={{ whiteSpace: "pre-wrap", fontFamily: FUENTE, fontSize: 13, lineHeight: 1.6, color: T.ink, margin: 0 }}>{modalMensaje.mensaje}</pre>
-        </Modal>
+        <div onClick={(e) => { if (e.target === e.currentTarget) setModalMensaje(null); }}
+          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.6)", zIndex: 50, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+          <div style={{ background: T.surface, border: "1px solid " + T.line, borderRadius: 16, maxWidth: 560, width: "100%", maxHeight: "80vh", overflowY: "auto", padding: "22px 24px" }}>
+            <h3 style={{ margin: "0 0 4px", fontSize: 15 }}>{modalMensaje.nombre}</h3>
+            <p style={{ fontSize: 12, color: T.inkSoft, marginBottom: 14 }}>
+              {numMensajeDe(modalMensaje) === 1 ? "1° mensaje" : "2° mensaje (seguimiento sin respuesta)"} — lo podés editar antes de enviarlo. El email sale sin la firma final, porque tu cliente de correo ya agrega la suya.
+            </p>
+            <textarea style={{ ...inp, resize: "vertical", minHeight: 260, fontFamily: FUENTE, fontSize: 13, lineHeight: 1.6 }}
+              value={textoModalMensaje} onChange={(e) => setTextoModalMensaje(e.target.value)} />
+            <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
+              <button style={btnVerde} onClick={guardarMensaje}>Guardar mensaje</button>
+              <button style={btnOut} onClick={() => setModalMensaje(null)}>Cancelar</button>
+            </div>
+          </div>
+        </div>
       )}
 
       {modalComentarios && (
@@ -603,6 +656,7 @@ function PanelFiltrosYListado({
   sedesDisponibles, conteoClave, esDireccion, puedeEditarIdentidad,
   comparativa, mejorRecup, totales, guardarTotal,
   onVerMensaje, onComentarios, onCambiarCampo, onMarcarEnvio,
+  numMensajeDe, elegirNumMensaje, mensajeActivoDe,
 }) {
   const s = estilos;
   const maxMotivo = Math.max(1, ...Object.values(motivoCounts));
@@ -837,21 +891,31 @@ function PanelFiltrosYListado({
                     {c.subido_por && <div style={{ fontSize: 11, color: T.inkSoft, marginTop: 2 }}>Cargado por: {c.subido_por}{c.cargo_subido_por ? " · " + c.cargo_subido_por : ""}</div>}
                   </td>
                   <td style={s.td}>
+                    <div style={{ display: "flex", gap: 4, marginBottom: 6 }}>
+                      <button onClick={() => elegirNumMensaje(c, 1)}
+                        style={{ ...s.smallBtn, fontWeight: numMensajeDe(c) === 1 ? 700 : 500, borderColor: numMensajeDe(c) === 1 ? T.marca : T.line, color: numMensajeDe(c) === 1 ? T.marca : T.inkSoft }}>1° mensaje</button>
+                      <button onClick={() => elegirNumMensaje(c, 2)}
+                        style={{ ...s.smallBtn, fontWeight: numMensajeDe(c) === 2 ? 700 : 500, borderColor: numMensajeDe(c) === 2 ? T.marca : T.line, color: numMensajeDe(c) === 2 ? T.marca : T.inkSoft }}>2° mensaje</button>
+                    </div>
                     <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                       {hasPhone
-                        ? <a href={waLink(c.telefono, c.mensaje)} target="_blank" rel="noreferrer" onClick={() => onMarcarEnvio(c)}
+                        ? <a href={waLink(c.telefono, mensajeActivoDe(c))} target="_blank" rel="noreferrer" onClick={() => onMarcarEnvio(c)}
                             style={{ display: "inline-flex", alignItems: "center", gap: 6, background: T.green, color: T.sobreClaro, textDecoration: "none", fontSize: 11.5, fontWeight: 700, padding: "7px 11px", borderRadius: 11 }}>
                             <IconoChat /> WhatsApp
                           </a>
                         : <span style={{ ...s.disabledBtn }}>Sin teléfono</span>}
                       {hasEmail
-                        ? <a href={mailLink(c.email, c.nombre, c.mensaje)} onClick={() => onMarcarEnvio(c)}
+                        ? <a href={mailLink(c.email, c.nombre, mensajeActivoDe(c))} onClick={() => onMarcarEnvio(c)}
                             style={{ display: "inline-flex", alignItems: "center", gap: 6, background: T.surface2, color: T.ink, textDecoration: "none", fontSize: 11.5, fontWeight: 700, padding: "7px 11px", borderRadius: 11, border: "1px solid " + T.line }}>
                             <IconoMail /> Email
                           </a>
                         : <span style={s.disabledBtn}><IconoMail /> Sin email</span>}
                     </div>
-                    <div style={{ fontSize: 11, color: T.inkSoft, marginTop: 4 }}>{c.fecha_envio_mensaje ? "Enviado: " + fmt(c.fecha_envio_mensaje) : "Sin enviar"}</div>
+                    <div style={{ fontSize: 11, color: T.inkSoft, marginTop: 4 }}>
+                      {numMensajeDe(c) === 1
+                        ? (c.fecha_envio_mensaje ? "1° enviado: " + fmt(c.fecha_envio_mensaje) : "1° sin enviar")
+                        : (c.fecha_envio_mensaje_2 ? "2° enviado: " + fmt(c.fecha_envio_mensaje_2) : "2° sin enviar")}
+                    </div>
                     {puedeEditarIdentidad ? (
                       <div style={{ display: "flex", flexDirection: "column", gap: 4, marginTop: 4 }}>
                         <input defaultValue={c.email || ""} placeholder="Email" onBlur={(e) => { const v = e.target.value.trim(); if (v !== (c.email || "")) onCambiarCampo(c.id, { email: v || null }); }}
