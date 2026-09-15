@@ -208,6 +208,7 @@ export default function Sleepers({ perfil, cargoFirma }) {
   const [filtroCargaDesde, setFiltroCargaDesde] = useState("");
   const [filtroCargaHasta, setFiltroCargaHasta] = useState("");
   const [filtroEnvio, setFiltroEnvio] = useState("");
+  const [filtroSoloVencidos, setFiltroSoloVencidos] = useState(false);
   const [modalMensaje, setModalMensaje] = useState(null);
   const [textoModalMensaje, setTextoModalMensaje] = useState("");
   const [numMensajePorCaso, setNumMensajePorCaso] = useState({});
@@ -235,17 +236,18 @@ export default function Sleepers({ perfil, cargoFirma }) {
     if (filtroCargaHasta && (!c.fecha_carga || c.fecha_carga > filtroCargaHasta)) return false;
     if (filtroEnvio === "Enviado" && !c.fecha_envio_mensaje) return false;
     if (filtroEnvio === "SinEnviar" && c.fecha_envio_mensaje) return false;
+    if (filtroSoloVencidos && !(c.fecha_seguimiento && c.fecha_seguimiento <= hoyStr() && c.estado === "Abierto")) return false;
     return true;
   }
 
   const filtrados = useMemo(() => casos.filter((c) => {
     if (filtroEstado && c.estado !== filtroEstado) return false;
     return pasaFiltrosComunes(c);
-  }), [casos, filtroSede, filtroEstado, busqueda, filtroRiesgo, filtroIntencion, filtroFinDesde, filtroFinHasta, filtroSegDesde, filtroSegHasta, filtroCargaDesde, filtroCargaHasta, filtroEnvio]);
+  }), [casos, filtroSede, filtroEstado, busqueda, filtroRiesgo, filtroIntencion, filtroFinDesde, filtroFinHasta, filtroSegDesde, filtroSegHasta, filtroCargaDesde, filtroCargaHasta, filtroEnvio, filtroSoloVencidos]);
 
   // Las estadisticas siempre reflejan el total (ignoran el filtro de Estado).
   const statsSet = useMemo(() => casos.filter((c) => pasaFiltrosComunes(c)),
-    [casos, filtroSede, busqueda, filtroRiesgo, filtroIntencion, filtroFinDesde, filtroFinHasta, filtroSegDesde, filtroSegHasta, filtroCargaDesde, filtroCargaHasta, filtroEnvio]);
+    [casos, filtroSede, busqueda, filtroRiesgo, filtroIntencion, filtroFinDesde, filtroFinHasta, filtroSegDesde, filtroSegHasta, filtroCargaDesde, filtroCargaHasta, filtroEnvio, filtroSoloVencidos]);
 
   const conteoClave = useMemo(() => {
     const map = {};
@@ -585,6 +587,7 @@ export default function Sleepers({ perfil, cargoFirma }) {
         filtroCargaDesde={filtroCargaDesde} setFiltroCargaDesde={setFiltroCargaDesde}
         filtroCargaHasta={filtroCargaHasta} setFiltroCargaHasta={setFiltroCargaHasta}
         filtroEnvio={filtroEnvio} setFiltroEnvio={setFiltroEnvio}
+        filtroSoloVencidos={filtroSoloVencidos} setFiltroSoloVencidos={setFiltroSoloVencidos}
         sedesDisponibles={sedesDisponibles} conteoClave={conteoClave}
         esDireccion={esDireccion} puedeEditarIdentidad={puedeEditarIdentidad}
         comparativa={comparativa} mejorRecup={mejorRecup} totales={totales} guardarTotal={guardarTotal}
@@ -653,6 +656,7 @@ function PanelFiltrosYListado({
   filtroSegDesde, setFiltroSegDesde, filtroSegHasta, setFiltroSegHasta,
   filtroCargaDesde, setFiltroCargaDesde, filtroCargaHasta, setFiltroCargaHasta,
   filtroEnvio, setFiltroEnvio,
+  filtroSoloVencidos, setFiltroSoloVencidos,
   sedesDisponibles, conteoClave, esDireccion, puedeEditarIdentidad,
   comparativa, mejorRecup, totales, guardarTotal,
   onVerMensaje, onComentarios, onCambiarCampo, onMarcarEnvio,
@@ -663,7 +667,7 @@ function PanelFiltrosYListado({
   const maxRiesgo = Math.max(1, ...Object.values(riesgoCounts));
   const maxCargados = Math.max(1, ...comparativa.map((c) => c.total));
   const maxIntencion = Math.max(1, conteoIntencion.Si, conteoIntencion.No, conteoIntencion.SinDefinir);
-  const hayFiltrosExtra = filtroRiesgo || filtroIntencion || filtroFinDesde || filtroFinHasta || filtroSegDesde || filtroSegHasta || filtroCargaDesde || filtroCargaHasta || filtroEnvio;
+  const hayFiltrosExtra = filtroRiesgo || filtroIntencion || filtroFinDesde || filtroFinHasta || filtroSegDesde || filtroSegHasta || filtroCargaDesde || filtroCargaHasta || filtroEnvio || filtroSoloVencidos;
 
   return (
     <div>
@@ -717,6 +721,10 @@ function PanelFiltrosYListado({
           <label style={lab}>Próximo seguimiento hasta</label>
           <input type="date" style={inp} value={filtroSegHasta} onChange={(e) => setFiltroSegHasta(e.target.value)} />
         </div>
+        <div style={{ minWidth: 150, display: "flex", alignItems: "center", gap: 6, paddingBottom: 10 }}>
+          <input type="checkbox" id="soloVencidos" checked={filtroSoloVencidos} onChange={(e) => setFiltroSoloVencidos(e.target.checked)} />
+          <label htmlFor="soloVencidos" style={{ fontSize: 12.5, color: T.ink, cursor: "pointer" }}>Solo seguimientos vencidos</label>
+        </div>
         <div style={{ minWidth: 150 }}>
           <label style={lab}>Fecha de carga desde</label>
           <input type="date" style={inp} value={filtroCargaDesde} onChange={(e) => setFiltroCargaDesde(e.target.value)} />
@@ -734,7 +742,7 @@ function PanelFiltrosYListado({
           </select>
         </div>
         {hayFiltrosExtra && (
-          <button style={s.ghostBtn} onClick={() => { setFiltroRiesgo(""); setFiltroIntencion(""); setFiltroFinDesde(""); setFiltroFinHasta(""); setFiltroSegDesde(""); setFiltroSegHasta(""); setFiltroCargaDesde(""); setFiltroCargaHasta(""); setFiltroEnvio(""); }}>
+          <button style={s.ghostBtn} onClick={() => { setFiltroRiesgo(""); setFiltroIntencion(""); setFiltroFinDesde(""); setFiltroFinHasta(""); setFiltroSegDesde(""); setFiltroSegHasta(""); setFiltroCargaDesde(""); setFiltroCargaHasta(""); setFiltroEnvio(""); setFiltroSoloVencidos(false); }}>
             <IconoX /> Limpiar filtros
           </button>
         )}
