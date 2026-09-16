@@ -33,6 +33,17 @@ const diasEntre = (desde, hasta) => {
   return Math.round((d2 - d1) / 86400000);
 };
 
+function bucketVencimiento(c) {
+  if (!c.fecha_fin_contrato) return null;
+  const dias = diasEntre(hoyStr(), c.fecha_fin_contrato);
+  if (dias < 0) return null;
+  if (dias <= 30) return "1-30";
+  if (dias <= 60) return "31-60";
+  if (dias <= 90) return "61-90";
+  if (dias <= 150) return "91-150";
+  return null;
+}
+
 function waLink(telefono, msg) { return "https://wa.me/" + telefono + "?text=" + encodeURIComponent(msg); }
 
 // El email ya lleva firma propia del cliente de correo (Gmail/Outlook), asi que
@@ -209,6 +220,7 @@ export default function Sleepers({ perfil, cargoFirma }) {
   const [filtroCargaHasta, setFiltroCargaHasta] = useState("");
   const [filtroEnvio, setFiltroEnvio] = useState("");
   const [filtroSoloVencidos, setFiltroSoloVencidos] = useState(false);
+  const [filtroVencimientoBucket, setFiltroVencimientoBucket] = useState(null);
   const [modalMensaje, setModalMensaje] = useState(null);
   const [textoModalMensaje, setTextoModalMensaje] = useState("");
   const [numMensajePorCaso, setNumMensajePorCaso] = useState({});
@@ -237,17 +249,47 @@ export default function Sleepers({ perfil, cargoFirma }) {
     if (filtroEnvio === "Enviado" && !c.fecha_envio_mensaje) return false;
     if (filtroEnvio === "SinEnviar" && c.fecha_envio_mensaje) return false;
     if (filtroSoloVencidos && !(c.fecha_seguimiento && c.fecha_seguimiento <= hoyStr() && c.estado === "Abierto")) return false;
+    if (filtroVencimientoBucket && bucketVencimiento(c) !== filtroVencimientoBucket) return false;
     return true;
   }
 
   const filtrados = useMemo(() => casos.filter((c) => {
     if (filtroEstado && c.estado !== filtroEstado) return false;
     return pasaFiltrosComunes(c);
-  }), [casos, filtroSede, filtroEstado, busqueda, filtroRiesgo, filtroIntencion, filtroFinDesde, filtroFinHasta, filtroSegDesde, filtroSegHasta, filtroCargaDesde, filtroCargaHasta, filtroEnvio, filtroSoloVencidos]);
+  }), [casos, filtroSede, filtroEstado, busqueda, filtroRiesgo, filtroIntencion, filtroFinDesde, filtroFinHasta, filtroSegDesde, filtroSegHasta, filtroCargaDesde, filtroCargaHasta, filtroEnvio, filtroSoloVencidos, filtroVencimientoBucket]);
 
   // Las estadisticas siempre reflejan el total (ignoran el filtro de Estado).
   const statsSet = useMemo(() => casos.filter((c) => pasaFiltrosComunes(c)),
-    [casos, filtroSede, busqueda, filtroRiesgo, filtroIntencion, filtroFinDesde, filtroFinHasta, filtroSegDesde, filtroSegHasta, filtroCargaDesde, filtroCargaHasta, filtroEnvio, filtroSoloVencidos]);
+    [casos, filtroSede, busqueda, filtroRiesgo, filtroIntencion, filtroFinDesde, filtroFinHasta, filtroSegDesde, filtroSegHasta, filtroCargaDesde, filtroCargaHasta, filtroEnvio, filtroSoloVencidos, filtroVencimientoBucket]);
+
+  // Base para las tortas: todo lo filtrado salvo el propio filtro de bucket/envio,
+  // asi los circulos no se "autoachican" al elegir una porcion.
+  const baseParaTortas = useMemo(() => casos.filter((c) => {
+    if (filtroSede && c.sede !== filtroSede) return false;
+    const b = norm(busqueda);
+    if (b && !(norm(c.nombre).includes(b) || norm(c.email).includes(b) || norm(c.dni).includes(b))) return false;
+    if (filtroRiesgo && c.riesgo !== filtroRiesgo) return false;
+    if (filtroIntencion === "SinDefinir" ? !!c.intencion_volver : (filtroIntencion && c.intencion_volver !== filtroIntencion)) return false;
+    if (filtroFinDesde && (!c.fecha_fin_contrato || c.fecha_fin_contrato < filtroFinDesde)) return false;
+    if (filtroFinHasta && (!c.fecha_fin_contrato || c.fecha_fin_contrato > filtroFinHasta)) return false;
+    if (filtroSegDesde && (!c.fecha_seguimiento || c.fecha_seguimiento < filtroSegDesde)) return false;
+    if (filtroSegHasta && (!c.fecha_seguimiento || c.fecha_seguimiento > filtroSegHasta)) return false;
+    if (filtroCargaDesde && (!c.fecha_carga || c.fecha_carga < filtroCargaDesde)) return false;
+    if (filtroCargaHasta && (!c.fecha_carga || c.fecha_carga > filtroCargaHasta)) return false;
+    if (filtroSoloVencidos && !(c.fecha_seguimiento && c.fecha_seguimiento <= hoyStr() && c.estado === "Abierto")) return false;
+    return true;
+  }), [casos, filtroSede, busqueda, filtroRiesgo, filtroIntencion, filtroFinDesde, filtroFinHasta, filtroSegDesde, filtroSegHasta, filtroCargaDesde, filtroCargaHasta, filtroSoloVencidos]);
+
+  const statsVencimiento = useMemo(() => {
+    const b = { "1-30": 0, "31-60": 0, "61-90": 0, "91-150": 0 };
+    baseParaTortas.forEach((c) => { const k = bucketVencimiento(c); if (k) b[k]++; });
+    return b;
+  }, [baseParaTortas]);
+
+  const statsEnvio = useMemo(() => {
+    const abiertos = baseParaTortas.filter((c) => c.estado === "Abierto");
+    return { con: abiertos.filter((c) => c.fecha_envio_mensaje).length, sin: abiertos.filter((c) => !c.fecha_envio_mensaje).length, total: abiertos.length };
+  }, [baseParaTortas]);
 
   const conteoClave = useMemo(() => {
     const map = {};
@@ -351,15 +393,24 @@ export default function Sleepers({ perfil, cargoFirma }) {
     URL.revokeObjectURL(url);
   }
 
-  function exportarCSV() {
-    const headers = ["Nombre", "DNI", "Email", "Telefono", "Sede", "Fecha carga", "Fecha envio mensaje", "Motivo", "Riesgo", "Proximo seguimiento", "Estado"];
-    const filas = casos.map((c) => [c.nombre, c.dni, c.email, c.telefono, c.sede, c.fecha_carga, c.fecha_envio_mensaje, c.motivo, c.riesgo, c.fecha_seguimiento, c.estado]
-      .map((v) => `"${(v || "").toString().replace(/"/g, '""')}"`).join(","));
-    const csv = headers.join(",") + "\n" + filas.join("\n");
-    const blob = new Blob([csv], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a"); a.href = url; a.download = `seguimiento_sleepers_${hoyStr()}.csv`; a.click();
-    URL.revokeObjectURL(url);
+  function exportarExcel() {
+    const filas = filtrados.map((c) => ({
+      Nombre: c.nombre, DNI: c.dni, Email: c.email, Telefono: c.telefono, Sede: c.sede,
+      "Fecha de carga": c.fecha_carga, "Fecha envío 1°": c.fecha_envio_mensaje, "Fecha envío 2°": c.fecha_envio_mensaje_2,
+      Motivo: c.motivo, Riesgo: c.riesgo, "Intención de volver": c.intencion_volver,
+      "Fin de contrato": c.fecha_fin_contrato, "Próximo seguimiento": c.fecha_seguimiento, Estado: c.estado,
+    }));
+    const ws = XLSX.utils.json_to_sheet(filas);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Sleepers");
+    XLSX.writeFile(wb, `seguimiento_sleepers_${hoyStr()}.xlsx`);
+  }
+  function clickVencimiento(bucket) {
+    setFiltroVencimientoBucket((prev) => (prev === bucket ? null : bucket));
+  }
+  function clickEnvio(valor) {
+    setFiltroEstado("Abierto");
+    setFiltroEnvio((prev) => (prev === valor ? "" : valor));
   }
 
   /* ---------- acciones por fila ---------- */
@@ -523,7 +574,7 @@ export default function Sleepers({ perfil, cargoFirma }) {
                   <input ref={fileRef} type="file" accept=".csv,.xlsx,.xls,.json" onChange={onFileChange} style={{ display: "none" }} />
                 </label>
                 <button style={s.ghostBtn} onClick={descargarPlantilla}><IconoBajar /> Descargar planilla modelo</button>
-                <button style={s.ghostBtn} onClick={exportarCSV}><IconoBajar /> Exportar datos actuales (CSV)</button>
+                <button style={s.ghostBtn} onClick={exportarExcel}><IconoBajar /> Exportar datos filtrados (Excel)</button>
               </div>
               <p style={{ fontSize: 11.5, color: T.inkSoft, margin: "0 0 16px" }}>
                 Columnas esperadas: <b style={{ color: T.ink }}>Nombre</b>, <b style={{ color: T.ink }}>DNI</b> (opcional), <b style={{ color: T.ink }}>Email</b>, <b style={{ color: T.ink }}>Teléfono</b>, <b style={{ color: T.ink }}>Sede</b>, <b style={{ color: T.ink }}>Última Visita</b> (opcional), <b style={{ color: T.ink }}>Fin de su contrato</b> (opcional — si vence en 90 días o menos, la fila se marca en rojo).
@@ -588,6 +639,9 @@ export default function Sleepers({ perfil, cargoFirma }) {
         filtroCargaHasta={filtroCargaHasta} setFiltroCargaHasta={setFiltroCargaHasta}
         filtroEnvio={filtroEnvio} setFiltroEnvio={setFiltroEnvio}
         filtroSoloVencidos={filtroSoloVencidos} setFiltroSoloVencidos={setFiltroSoloVencidos}
+        filtroVencimientoBucket={filtroVencimientoBucket} onClickVencimiento={clickVencimiento} setFiltroVencimientoBucket={setFiltroVencimientoBucket}
+        onClickEnvio={clickEnvio} statsVencimiento={statsVencimiento} statsEnvio={statsEnvio}
+        totalSede={statsSet.length}
         sedesDisponibles={sedesDisponibles} conteoClave={conteoClave}
         esDireccion={esDireccion} puedeEditarIdentidad={puedeEditarIdentidad}
         comparativa={comparativa} mejorRecup={mejorRecup} totales={totales} guardarTotal={guardarTotal}
@@ -657,6 +711,7 @@ function PanelFiltrosYListado({
   filtroCargaDesde, setFiltroCargaDesde, filtroCargaHasta, setFiltroCargaHasta,
   filtroEnvio, setFiltroEnvio,
   filtroSoloVencidos, setFiltroSoloVencidos,
+  filtroVencimientoBucket, onClickVencimiento, setFiltroVencimientoBucket, onClickEnvio, statsVencimiento, statsEnvio, totalSede,
   sedesDisponibles, conteoClave, esDireccion, puedeEditarIdentidad,
   comparativa, mejorRecup, totales, guardarTotal,
   onVerMensaje, onComentarios, onCambiarCampo, onMarcarEnvio,
@@ -667,10 +722,60 @@ function PanelFiltrosYListado({
   const maxRiesgo = Math.max(1, ...Object.values(riesgoCounts));
   const maxCargados = Math.max(1, ...comparativa.map((c) => c.total));
   const maxIntencion = Math.max(1, conteoIntencion.Si, conteoIntencion.No, conteoIntencion.SinDefinir);
-  const hayFiltrosExtra = filtroRiesgo || filtroIntencion || filtroFinDesde || filtroFinHasta || filtroSegDesde || filtroSegHasta || filtroCargaDesde || filtroCargaHasta || filtroEnvio || filtroSoloVencidos;
+  const hayFiltrosExtra = filtroRiesgo || filtroIntencion || filtroFinDesde || filtroFinHasta || filtroSegDesde || filtroSegHasta || filtroCargaDesde || filtroCargaHasta || filtroEnvio || filtroSoloVencidos || filtroVencimientoBucket;
 
   return (
     <div>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 16, marginBottom: 20 }}>
+        <div>
+          <div style={{ fontSize: 12.5, color: T.inkSoft }}>Total de sleepers</div>
+          <div style={{ fontSize: 30, fontWeight: 800 }}>{totalSede}</div>
+        </div>
+      </div>
+
+      <p style={{ fontSize: 11.5, textTransform: "uppercase", letterSpacing: ".04em", color: T.inkSoft, marginBottom: 8 }}>Vencimiento de contrato — tocá para filtrar</p>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(130px,1fr))", gap: 10, marginBottom: 18 }}>
+        {[
+          { key: "1-30", label: "1 a 30 días", color: T.red },
+          { key: "31-60", label: "31 a 60 días", color: T.amber },
+          { key: "61-90", label: "61 a 90 días", color: T.amber },
+          { key: "91-150", label: "91 a 150 días", color: T.green },
+        ].map(({ key, label, color }) => {
+          const total = Object.values(statsVencimiento).reduce((a, b) => a + b, 0) || 1;
+          const n = statsVencimiento[key] || 0;
+          const pct = Math.round((n / total) * 100);
+          const activo = filtroVencimientoBucket === key;
+          return (
+            <button key={key} onClick={() => onClickVencimiento(key)}
+              style={{ textAlign: "center", background: activo ? T.surface2 : T.surface, border: "1px solid " + (activo ? T.marca : T.line), borderRadius: 12, padding: "12px 8px", cursor: "pointer", fontFamily: FUENTE }}>
+              <div style={{ width: 52, height: 52, borderRadius: "50%", margin: "0 auto 8px", background: `conic-gradient(${color} 0% ${pct}%, ${T.surface2} ${pct}% 100%)` }} />
+              <div style={{ fontSize: 18, fontWeight: 800 }}>{n}</div>
+              <div style={{ fontSize: 10.5, color: T.inkSoft }}>{label}</div>
+            </button>
+          );
+        })}
+      </div>
+
+      <p style={{ fontSize: 11.5, textTransform: "uppercase", letterSpacing: ".04em", color: T.inkSoft, marginBottom: 8 }}>Casos abiertos — envío de mensaje — tocá para filtrar</p>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(130px,1fr))", gap: 10, marginBottom: 22 }}>
+        {[
+          { key: "Enviado", label: "Con envío", n: statsEnvio.con, color: T.green },
+          { key: "SinEnviar", label: "Sin envío", n: statsEnvio.sin, color: T.line },
+        ].map(({ key, label, n, color }) => {
+          const total = statsEnvio.total || 1;
+          const pct = Math.round((n / total) * 100);
+          const activo = filtroEnvio === key && filtroEstado === "Abierto";
+          return (
+            <button key={key} onClick={() => onClickEnvio(key)}
+              style={{ textAlign: "center", background: activo ? T.surface2 : T.surface, border: "1px solid " + (activo ? T.marca : T.line), borderRadius: 12, padding: "12px 8px", cursor: "pointer", fontFamily: FUENTE }}>
+              <div style={{ width: 52, height: 52, borderRadius: "50%", margin: "0 auto 8px", background: `conic-gradient(${color} 0% ${pct}%, ${T.surface2} ${pct}% 100%)` }} />
+              <div style={{ fontSize: 18, fontWeight: 800 }}>{n}</div>
+              <div style={{ fontSize: 10.5, color: T.inkSoft }}>{label} ({pct}%)</div>
+            </button>
+          );
+        })}
+      </div>
+
       <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "flex-end", marginBottom: 10 }}>
         <div style={{ minWidth: 160 }}>
           <label style={lab}>Sede</label>
@@ -742,7 +847,7 @@ function PanelFiltrosYListado({
           </select>
         </div>
         {hayFiltrosExtra && (
-          <button style={s.ghostBtn} onClick={() => { setFiltroRiesgo(""); setFiltroIntencion(""); setFiltroFinDesde(""); setFiltroFinHasta(""); setFiltroSegDesde(""); setFiltroSegHasta(""); setFiltroCargaDesde(""); setFiltroCargaHasta(""); setFiltroEnvio(""); setFiltroSoloVencidos(false); }}>
+          <button style={s.ghostBtn} onClick={() => { setFiltroRiesgo(""); setFiltroIntencion(""); setFiltroFinDesde(""); setFiltroFinHasta(""); setFiltroSegDesde(""); setFiltroSegHasta(""); setFiltroCargaDesde(""); setFiltroCargaHasta(""); setFiltroEnvio(""); setFiltroSoloVencidos(false); setFiltroVencimientoBucket(null); }}>
             <IconoX /> Limpiar filtros
           </button>
         )}
