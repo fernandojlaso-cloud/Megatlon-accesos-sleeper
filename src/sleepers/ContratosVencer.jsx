@@ -4,7 +4,7 @@ import { T, FUENTE, inp, lab, btnMarca, btnOut, btnVerde, Badge } from "../estil
 import {
   useSeguimientoContratos, actualizarRegistro, agregarComentarioRegistro,
   parsearContratos, parsearAccesos, parsearNPS, combinarPlanillas, guardarSeguimientoMes,
-  clasificar, construirMensajeContrato, mensajeContratoSinFirma,
+  clasificar, construirMensajeContrato, mensajeContratoSinFirma, nivelAsistencia, segmentoNPS,
 } from "./datosContratos.js";
 import {
   IconoSubir, IconoChat, IconoMail, IconoAlerta, IconoCheckCirculo, IconoX,
@@ -114,6 +114,8 @@ export default function ContratosVencer({ perfil, cargoFirma }) {
   const [filtroAsistHasta, setFiltroAsistHasta] = useState("");
   const [filtroNpsDesde, setFiltroNpsDesde] = useState("");
   const [filtroNpsHasta, setFiltroNpsHasta] = useState("");
+  const [filtroAccesoBucket, setFiltroAccesoBucket] = useState(null);
+  const [filtroNpsBucket, setFiltroNpsBucket] = useState(null);
   const [modalComentarios, setModalComentarios] = useState(null);
   const [nuevoComentario, setNuevoComentario] = useState("");
   const [modalMensaje, setModalMensaje] = useState(null);
@@ -127,7 +129,7 @@ export default function ContratosVencer({ perfil, cargoFirma }) {
     return d >= 91 && d <= 150;
   }), [registros]);
 
-  const filtrados = useMemo(() => enVentana.filter((r) => {
+  function pasaFiltrosBase(r) {
     if (filtroSede && r.sede !== filtroSede) return false;
     if (filtroEstado && r.estado !== filtroEstado) return false;
     if (filtroResultado && (filtroResultado === "SinDefinir" ? !!r.resultado_gestion : r.resultado_gestion !== filtroResultado)) return false;
@@ -145,7 +147,62 @@ export default function ContratosVencer({ perfil, cargoFirma }) {
     const b = norm(busqueda);
     if (b && !(norm(r.nombre).includes(b) || norm(r.dni).includes(b))) return false;
     return true;
-  }), [enVentana, filtroSede, filtroEstado, filtroResultado, filtroClasif, busqueda, filtroAsistDesde, filtroAsistHasta, filtroNpsDesde, filtroNpsHasta]);
+  }
+
+  function accesoBucketDe(r) {
+    const n = nivelAsistencia(r.asistencias_2m);
+    if (n === "Alta") return "A";
+    if (n === "Media") return "B";
+    if (n === "Baja") return "C";
+    return null;
+  }
+  function npsBucketDe(r) {
+    if (r.nps_score === null || r.nps_score === undefined) return "SinNPS";
+    return segmentoNPS(r.nps_score);
+  }
+
+  const filtrados = useMemo(() => enVentana.filter((r) => {
+    if (!pasaFiltrosBase(r)) return false;
+    if (filtroAccesoBucket && accesoBucketDe(r) !== filtroAccesoBucket) return false;
+    if (filtroNpsBucket && npsBucketDe(r) !== filtroNpsBucket) return false;
+    return true;
+  }), [enVentana, filtroSede, filtroEstado, filtroResultado, filtroClasif, busqueda, filtroAsistDesde, filtroAsistHasta, filtroNpsDesde, filtroNpsHasta, filtroAccesoBucket, filtroNpsBucket]);
+
+  // Base estable para las tortas: todos los filtros salvo los de las propias
+  // tortas, asi los circulos no se autoachican al elegir una porcion.
+  const baseParaTortas = useMemo(() => enVentana.filter((r) => pasaFiltrosBase(r)),
+    [enVentana, filtroSede, filtroEstado, filtroResultado, filtroClasif, busqueda, filtroAsistDesde, filtroAsistHasta, filtroNpsDesde, filtroNpsHasta]);
+
+  const statsAcceso = useMemo(() => {
+    const b = { A: 0, B: 0, C: 0 };
+    baseParaTortas.forEach((r) => { const k = accesoBucketDe(r); if (k) b[k]++; });
+    return b;
+  }, [baseParaTortas]);
+
+  const statsNps = useMemo(() => {
+    const b = { Promotor: 0, Pasivo: 0, Detractor: 0, SinNPS: 0 };
+    baseParaTortas.forEach((r) => { b[npsBucketDe(r)]++; });
+    return b;
+  }, [baseParaTortas]);
+
+  function clickAcceso(bucket) {
+    setFiltroAccesoBucket((prev) => (prev === bucket ? null : bucket));
+  }
+  function clickNps(bucket) {
+    setFiltroNpsBucket((prev) => (prev === bucket ? null : bucket));
+  }
+  function exportarExcel() {
+    const filas = filtrados.map((r) => ({
+      Nombre: r.nombre, DNI: r.dni, Email: r.email, Telefono: r.telefono, Sede: r.sede,
+      "Fin de contrato": r.fecha_fin_contrato, "Asistencias (2m)": r.asistencias_2m, NPS: r.nps_score,
+      Clasificación: r._clasif.completo ? `${r._clasif.score}/10` : "—",
+      Estado: r.estado, "Resultado de gestión": r.resultado_gestion,
+    }));
+    const ws = XLSX.utils.json_to_sheet(filas);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Contratos a vencer");
+    XLSX.writeFile(wb, `contratos_a_vencer_${hoyStr()}.xlsx`);
+  }
 
   const stats = useMemo(() => {
     const base = filtrados;
@@ -378,6 +435,55 @@ export default function ContratosVencer({ perfil, cargoFirma }) {
         </div>
       )}
 
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 16, marginBottom: 16 }}>
+        <button style={btnOut} onClick={exportarExcel}><IconoFlechaAbajo /> Exportar datos filtrados (Excel)</button>
+      </div>
+
+      <p style={{ fontSize: 11.5, textTransform: "uppercase", letterSpacing: ".04em", color: T.inkSoft, marginBottom: 8 }}>Nivel de asistencia — tocá para filtrar</p>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(140px,1fr))", gap: 10, marginBottom: 18 }}>
+        {[
+          { key: "A", label: "Acceso A (+24 accesos)", color: T.green },
+          { key: "B", label: "Acceso B (10 a 23 accesos)", color: T.amber },
+          { key: "C", label: "Acceso C (1 a 9 accesos)", color: T.red },
+        ].map(({ key, label, color }) => {
+          const total = statsAcceso.A + statsAcceso.B + statsAcceso.C || 1;
+          const n = statsAcceso[key];
+          const pct = Math.round((n / total) * 100);
+          const activo = filtroAccesoBucket === key;
+          return (
+            <button key={key} onClick={() => clickAcceso(key)}
+              style={{ textAlign: "center", background: activo ? T.surface2 : T.surface, border: "1px solid " + (activo ? T.marca : T.line), borderRadius: 12, padding: "12px 8px", cursor: "pointer", fontFamily: FUENTE }}>
+              <div style={{ width: 52, height: 52, borderRadius: "50%", margin: "0 auto 8px", background: `conic-gradient(${color} 0% ${pct}%, ${T.surface2} ${pct}% 100%)` }} />
+              <div style={{ fontSize: 18, fontWeight: 800 }}>{n}</div>
+              <div style={{ fontSize: 10.5, color: T.inkSoft }}>{label}</div>
+            </button>
+          );
+        })}
+      </div>
+
+      <p style={{ fontSize: 11.5, textTransform: "uppercase", letterSpacing: ".04em", color: T.inkSoft, marginBottom: 8 }}>Segmento NPS — tocá para filtrar</p>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(140px,1fr))", gap: 10, marginBottom: 22 }}>
+        {[
+          { key: "Promotor", label: "Promotores (9-10 NPS)", color: T.green },
+          { key: "Pasivo", label: "Pasivos (7-8 NPS)", color: T.amber },
+          { key: "Detractor", label: "Detractores (0-6 NPS)", color: T.red },
+          { key: "SinNPS", label: "Sin NPS", color: T.line },
+        ].map(({ key, label, color }) => {
+          const total = statsNps.Promotor + statsNps.Pasivo + statsNps.Detractor + statsNps.SinNPS || 1;
+          const n = statsNps[key];
+          const pct = Math.round((n / total) * 100);
+          const activo = filtroNpsBucket === key;
+          return (
+            <button key={key} onClick={() => clickNps(key)}
+              style={{ textAlign: "center", background: activo ? T.surface2 : T.surface, border: "1px solid " + (activo ? T.marca : T.line), borderRadius: 12, padding: "12px 8px", cursor: "pointer", fontFamily: FUENTE }}>
+              <div style={{ width: 52, height: 52, borderRadius: "50%", margin: "0 auto 8px", background: `conic-gradient(${color} 0% ${pct}%, ${T.surface2} ${pct}% 100%)` }} />
+              <div style={{ fontSize: 18, fontWeight: 800 }}>{n}</div>
+              <div style={{ fontSize: 10.5, color: T.inkSoft }}>{label}</div>
+            </button>
+          );
+        })}
+      </div>
+
       <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "flex-end", marginBottom: 16 }}>
         <div style={{ minWidth: 160 }}>
           <label style={lab}>Sede</label>
@@ -437,8 +543,8 @@ export default function ContratosVencer({ perfil, cargoFirma }) {
           <label style={lab}>NPS hasta</label>
           <input type="number" min="0" max="10" style={inp} value={filtroNpsHasta} onChange={(e) => setFiltroNpsHasta(e.target.value)} placeholder="Máx." />
         </div>
-        {(filtroAsistDesde !== "" || filtroAsistHasta !== "" || filtroNpsDesde !== "" || filtroNpsHasta !== "") && (
-          <button style={btnOut} onClick={() => { setFiltroAsistDesde(""); setFiltroAsistHasta(""); setFiltroNpsDesde(""); setFiltroNpsHasta(""); }}>
+        {(filtroAsistDesde !== "" || filtroAsistHasta !== "" || filtroNpsDesde !== "" || filtroNpsHasta !== "" || filtroAccesoBucket || filtroNpsBucket) && (
+          <button style={btnOut} onClick={() => { setFiltroAsistDesde(""); setFiltroAsistHasta(""); setFiltroNpsDesde(""); setFiltroNpsHasta(""); setFiltroAccesoBucket(null); setFiltroNpsBucket(null); }}>
             <IconoX /> Limpiar asistencia/NPS
           </button>
         )}
