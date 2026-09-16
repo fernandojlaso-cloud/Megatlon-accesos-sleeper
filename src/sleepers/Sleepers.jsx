@@ -109,8 +109,17 @@ function parseCSV(text) {
   });
 }
 function normalizarFecha(valor) {
-  if (!valor) return "";
-  if (valor instanceof Date && !isNaN(valor)) return valor.toISOString().slice(0, 10);
+  if (valor === null || valor === undefined || valor === "") return "";
+  if (valor instanceof Date && !isNaN(valor)) {
+    const y = valor.getFullYear(), mo = valor.getMonth() + 1, d = valor.getDate();
+    return `${y}-${String(mo).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+  }
+  // Excel a veces manda la fecha como numero de serie (ej: 46341) cuando la
+  // celda de origen no tiene formato de fecha aplicado, en vez de un objeto Date.
+  if (typeof valor === "number" && valor > 0 && valor < 100000) {
+    const info = XLSX.SSF.parse_date_code(valor);
+    if (info && info.y) return `${info.y}-${String(info.m).padStart(2, "0")}-${String(info.d).padStart(2, "0")}`;
+  }
   const str = valor.toString().trim();
   if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
   const m = str.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})$/);
@@ -136,7 +145,7 @@ function mapRow(row, defaults) {
     email: findTxt("email", "correo", "mail", "e-mail", "mail socio"),
     telefono: findTxt("telefono", "celular", "whatsapp", "tel", "numero", "número", "telefono socio"),
     sede: findTxt("sede", "sucursal", "sucursal acceso") || defaults.sede,
-    ultimaVisita: findTxt("ultima visita", "fecha ultima visita", "ultimo ingreso", "fecha ultimo acceso"),
+    ultimaVisita: normalizarFecha(find("ultima visita", "fecha ultima visita", "ultimo ingreso", "fecha ultimo acceso", "ultimo acceso")),
     fechaFinContrato: normalizarFecha(find("fin de su contrato", "fin de contrato", "fin contrato", "vencimiento", "vencimiento plan", "fecha vencimiento", "fecha fin contrato")),
   };
 }
@@ -256,6 +265,11 @@ export default function Sleepers({ perfil, cargoFirma }) {
   const filtrados = useMemo(() => casos.filter((c) => {
     if (filtroEstado && c.estado !== filtroEstado) return false;
     return pasaFiltrosComunes(c);
+  }).sort((a, b) => {
+    if (!a.fecha_fin_contrato && !b.fecha_fin_contrato) return 0;
+    if (!a.fecha_fin_contrato) return 1;
+    if (!b.fecha_fin_contrato) return -1;
+    return a.fecha_fin_contrato < b.fecha_fin_contrato ? -1 : a.fecha_fin_contrato > b.fecha_fin_contrato ? 1 : 0;
   }), [casos, filtroSede, filtroEstado, busqueda, filtroRiesgo, filtroIntencion, filtroFinDesde, filtroFinHasta, filtroSegDesde, filtroSegHasta, filtroCargaDesde, filtroCargaHasta, filtroEnvio, filtroSoloVencidos, filtroVencimientoBucket]);
 
   // Las estadisticas siempre reflejan el total (ignoran el filtro de Estado).
