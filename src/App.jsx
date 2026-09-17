@@ -5,6 +5,7 @@ import Sleepers from "./sleepers/Sleepers.jsx";
 import Administrador from "./sleepers/Administrador.jsx";
 import Supervisor from "./sleepers/Supervisor.jsx";
 import ContratosVencer from "./sleepers/ContratosVencer.jsx";
+import Gift from "./sleepers/Gift.jsx";
 
 /* ============================================================
    EJEMPLO DE USO
@@ -60,6 +61,7 @@ export default function App() {
     : [
         ["sleepers", "Sleepers"],
         ["contratos", "Contratos a Vencer"],
+        ["gift", "Gift"],
         ...(esDireccion ? [["panorama", "Panorama"]] : []),
         ...(puedeAdministrador ? [["administrador", "Administrador"]] : []),
         ...(puedeEquipo ? [["equipo", "Equipo"], ["actividad", "Actividad"]] : []),
@@ -69,7 +71,7 @@ export default function App() {
   return (
     <div style={{ minHeight: "100vh", background: T.fondo, fontFamily: FUENTE, color: T.ink }}>
       <header style={{ background: T.negro, borderBottom: "1px solid " + T.line, padding: "15px 24px" }}>
-        <div style={{ maxWidth: ["sleepers","administrador","panorama","contratos"].includes(solapaActual) ? 1900 : 1000, margin: "0 auto", display: "flex", alignItems: "center",
+        <div style={{ maxWidth: ["sleepers","administrador","panorama","contratos","gift"].includes(solapaActual) ? 1900 : 1000, margin: "0 auto", display: "flex", alignItems: "center",
           justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
           <Logo size={22} />
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
@@ -97,7 +99,7 @@ export default function App() {
       </header>
 
       <div style={{ background: T.negro, borderBottom: "1px solid " + T.line }}>
-        <div style={{ maxWidth: ["sleepers","administrador","panorama","contratos"].includes(solapaActual) ? 1900 : 1000, margin: "0 auto", padding: "0 16px", display: "flex", gap: 2, overflowX: "auto" }}>
+        <div style={{ maxWidth: ["sleepers","administrador","panorama","contratos","gift"].includes(solapaActual) ? 1900 : 1000, margin: "0 auto", padding: "0 16px", display: "flex", gap: 2, overflowX: "auto" }}>
           {SOLAPAS.map((x) => {
             const on = solapaActual === x[0];
             return (
@@ -111,9 +113,10 @@ export default function App() {
         </div>
       </div>
 
-      <main style={{ maxWidth: ["sleepers","administrador","panorama","contratos"].includes(solapaActual) ? 1900 : 1000, margin: "0 auto", padding: "20px 16px 60px" }}>
+      <main style={{ maxWidth: ["sleepers","administrador","panorama","contratos","gift"].includes(solapaActual) ? 1900 : 1000, margin: "0 auto", padding: "20px 16px 60px" }}>
         {solapaActual === "sleepers" && <Sleepers perfil={perfil} cargoFirma={cargoFirma} />}
         {solapaActual === "contratos" && <ContratosVencer perfil={perfil} cargoFirma={cargoFirma} />}
+        {solapaActual === "gift" && <Gift perfil={perfil} cargoFirma={cargoFirma} />}
         {solapaActual === "administrador" && puedeAdministrador && <Administrador perfil={perfil} />}
         {solapaActual === "equipo" && puedeEquipo && <Equipo perfil={perfil} />}
         {solapaActual === "actividad" && puedeEquipo && <Actividad />}

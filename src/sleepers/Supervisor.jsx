@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { T, FUENTE, Badge } from "../estilos.jsx";
 import { useCasos } from "./datos.js";
 import { useSeguimientoContratos, clasificar } from "./datosContratos.js";
+import { useGift } from "./datosGift.js";
 import { supabase } from "../supabase.js";
 
 const hoyStr = () => new Date().toISOString().slice(0, 10);
@@ -121,6 +122,28 @@ export default function Supervisor() {
     const sinResultado = contratosEnVentana.filter((r) => !r.resultado_gestion).length;
     return { total: contratosEnVentana.length, critico, atencion, saludable, incompleto, abiertos, enSeguimiento, cerrados, renovo, noRenovo, pensando, sinResultado };
   }, [contratosEnVentana]);
+
+  const { gift: giftTodo } = useGift();
+  const macroGift = useMemo(() => {
+    const envio1 = giftTodo.filter((g) => g.fecha_envio_1).length;
+    const coordinado = giftTodo.filter((g) => g.dia_hora_coordinado).length;
+    const vino = giftTodo.filter((g) => g.vino_a_probar === "Si").length;
+    const inscriptoSi = giftTodo.filter((g) => g.se_inscribio === "Si").length;
+    const inscriptoNo = giftTodo.filter((g) => g.se_inscribio === "No").length;
+    const pendiente = giftTodo.filter((g) => !g.se_inscribio).length;
+    return { total: giftTodo.length, envio1, coordinado, vino, inscriptoSi, inscriptoNo, pendiente };
+  }, [giftTodo]);
+
+  const giftPorSede = useMemo(() => {
+    const sedes = [...new Set(giftTodo.map((g) => g.sede).filter(Boolean))].sort();
+    return sedes.map((sede) => {
+      const lista = giftTodo.filter((g) => g.sede === sede);
+      const total = lista.length;
+      const inscriptoSi = lista.filter((g) => g.se_inscribio === "Si").length;
+      return { sede, total, vino: lista.filter((g) => g.vino_a_probar === "Si").length, inscriptoSi,
+        pctInscripto: total ? Math.round((inscriptoSi / total) * 100) : 0 };
+    });
+  }, [giftTodo]);
 
   const contratosPorSede = useMemo(() => {
     const sedes = [...new Set(contratosEnVentana.map((r) => r.sede).filter(Boolean))].sort();
@@ -320,6 +343,40 @@ export default function Supervisor() {
               </tr>
             </tfoot>
           )}
+        </table>
+      </div>
+
+      <p style={{ ...sectionTitle, marginTop: 34 }}>Gift — mes de regalo a ex-socios</p>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))", gap: 14, marginBottom: 22 }}>
+        <Macro n={macroGift.total} l="Total" color={T.marca} />
+        <Macro n={macroGift.envio1} l="Envío mensaje 1" color={T.blue} />
+        <Macro n={macroGift.coordinado} l="Coordinó visita" color={T.amber} />
+        <Macro n={macroGift.vino} l="Vino a probar" color={T.amber} />
+        <Macro n={macroGift.inscriptoSi} l="Se inscribió" color={T.green} />
+        <Macro n={macroGift.inscriptoNo} l="No se inscribió" color={T.red} />
+      </div>
+      <div style={{ background: T.surface, border: "1px solid " + T.line, borderRadius: 16, overflowX: "auto" }}>
+        <table style={{ width: "100%", fontSize: 13, borderCollapse: "collapse" }}>
+          <thead>
+            <tr>
+              <th style={th}>Sucursal</th>
+              <th style={th}>Total</th>
+              <th style={th}>Vino a probar</th>
+              <th style={th}>Se inscribió</th>
+              <th style={th}>% inscripto</th>
+            </tr>
+          </thead>
+          <tbody>
+            {giftPorSede.map((s) => (
+              <tr key={s.sede}>
+                <td style={{ ...td, fontWeight: 700 }}>{s.sede}</td>
+                <td style={td}>{s.total}</td>
+                <td style={td}>{s.vino}</td>
+                <td style={td}>{s.inscriptoSi}</td>
+                <td style={td}>{s.pctInscripto}%</td>
+              </tr>
+            ))}
+          </tbody>
         </table>
       </div>
     </div>

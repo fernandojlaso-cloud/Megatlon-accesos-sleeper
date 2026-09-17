@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { T, FUENTE, inp, lab, btnOut, btnVerde, Badge } from "../estilos.jsx";
 import { useCasos, actualizarCaso, eliminarCasos, reasignarSede } from "./datos.js";
 import { useSeguimientoContratos, actualizarRegistro, eliminarRegistros, reasignarSedeRegistros, clasificar, construirMensajeContrato } from "./datosContratos.js";
+import { useGift, actualizarGift, eliminarGift, reasignarSedeGift } from "./datosGift.js";
 import { useBancoPreguntas, crearPregunta, actualizarPregunta, eliminarPregunta } from "./datosPreguntas.js";
 import { useMensajesPlantillas, crearPlantilla, actualizarPlantilla, eliminarPlantilla, construirMensajeSleeper, obtenerPlantillasActivas } from "./datosPlantillas.js";
 import { IconoBasura, IconoPin, IconoCandado, IconoMas } from "./iconos.jsx";
@@ -38,12 +39,14 @@ export default function Administrador({ perfil }) {
       <div style={{ display: "flex", gap: 8, marginBottom: 20, borderBottom: "1px solid " + T.line }}>
         <button onClick={() => setSegmento("sleepers")} style={tabBtn(segmento === "sleepers")}>Sleepers</button>
         <button onClick={() => setSegmento("contratos")} style={tabBtn(segmento === "contratos")}>Contratos a Vencer</button>
+        <button onClick={() => setSegmento("gift")} style={tabBtn(segmento === "gift")}>Gift</button>
         {esDireccion && <button onClick={() => setSegmento("preguntas")} style={tabBtn(segmento === "preguntas")}>Preguntas de evaluación</button>}
         {esDireccion && <button onClick={() => setSegmento("mensajes")} style={tabBtn(segmento === "mensajes")}>Mensajes a socios</button>}
       </div>
 
       {segmento === "sleepers" && <SegmentoSleepers puedeEliminar={puedeEliminar} perfil={perfil} />}
       {segmento === "contratos" && <SegmentoContratos puedeEliminar={puedeEliminar} perfil={perfil} />}
+      {segmento === "gift" && <SegmentoGift puedeEliminar={puedeEliminar} perfil={perfil} />}
       {segmento === "preguntas" && esDireccion && <SegmentoPreguntas perfil={perfil} />}
       {segmento === "mensajes" && esDireccion && <SegmentoMensajes perfil={perfil} />}
     </div>
@@ -193,6 +196,130 @@ function SegmentoSleepers({ puedeEliminar, perfil }) {
                   onChange={(e) => onCambiaCampo(c.id, "telefono", e.target.value)} onBlur={() => guardarCampo(c, "telefono")} /></td>
                 <td style={td}><input style={{ ...inp, ...campoEditable }} value={valorCampo(c, "sede")}
                   onChange={(e) => onCambiaCampo(c.id, "sede", e.target.value)} onBlur={() => guardarCampo(c, "sede")} /></td>
+                <td style={{ ...td, color: T.inkSoft }}>{c.subido_por || "—"}{c.cargo_subido_por ? " · " + c.cargo_subido_por : ""}</td>
+                <td style={{ ...td, color: T.inkSoft }}><Badge tone={c.estado === "Cerrado" ? "green" : "gris"}>{c.estado}</Badge></td>
+                {puedeEliminar && <td style={td}><button onClick={() => eliminarUno(c.id)} style={delBtn}><IconoBasura /></button></td>}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
+   Segmento Gift
+   ============================================================ */
+function SegmentoGift({ puedeEliminar, perfil }) {
+  const { gift } = useGift();
+  const [busqueda, setBusqueda] = useState("");
+  const [filtroSede, setFiltroSede] = useState("");
+  const [seleccionados, setSeleccionados] = useState(new Set());
+  const [nuevaSede, setNuevaSede] = useState("");
+  const [ediciones, setEdiciones] = useState({});
+  const [procesando, setProcesando] = useState(false);
+
+  const sedes = useMemo(() => [...new Set(gift.map((c) => c.sede).filter(Boolean))].sort(), [gift]);
+  const filtrados = useMemo(() => gift.filter((c) => {
+    if (filtroSede && c.sede !== filtroSede) return false;
+    const b = norm(busqueda);
+    if (b && !(norm(c.nombre).includes(b) || norm(c.dni).includes(b) || norm(c.email).includes(b))) return false;
+    return true;
+  }), [gift, filtroSede, busqueda]);
+
+  function toggle(id) { setSeleccionados((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; }); }
+  function toggleTodos() { setSeleccionados((prev) => prev.size === filtrados.length ? new Set() : new Set(filtrados.map((c) => c.id))); }
+  function valorCampo(c, campo) { return ediciones[c.id]?.[campo] ?? (c[campo] || ""); }
+  function onCambiaCampo(id, campo, valor) { setEdiciones((prev) => ({ ...prev, [id]: { ...prev[id], [campo]: valor } })); }
+  async function guardarCampo(c, campo) {
+    const valor = valorCampo(c, campo).trim();
+    if (valor === (c[campo] || "")) return;
+    try { await actualizarGift(c.id, { [campo]: valor || null }); }
+    catch (err) { alert("No se pudo guardar: " + err.message); onCambiaCampo(c.id, campo, c[campo] || ""); }
+  }
+  async function eliminarUno(id) {
+    if (!confirm("¿Eliminar este caso de Gift? No se puede deshacer.")) return;
+    try { await eliminarGift([id]); } catch (err) { alert(err.message); }
+  }
+  async function eliminarSeleccionados() {
+    if (!seleccionados.size) return alert("Seleccioná al menos un caso.");
+    if (!confirm(`¿Eliminar ${seleccionados.size} caso(s)? No se puede deshacer.`)) return;
+    setProcesando(true);
+    try { await eliminarGift([...seleccionados]); setSeleccionados(new Set()); }
+    catch (err) { alert(err.message); }
+    finally { setProcesando(false); }
+  }
+  async function reasignarSeleccionados() {
+    if (!seleccionados.size) return alert("Seleccioná al menos un caso.");
+    if (!nuevaSede.trim()) return alert("Escribí la sede de destino.");
+    setProcesando(true);
+    try { await reasignarSedeGift([...seleccionados], nuevaSede.trim()); setSeleccionados(new Set()); setNuevaSede(""); }
+    catch (err) { alert(err.message); }
+    finally { setProcesando(false); }
+  }
+
+  return (
+    <div>
+      <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "flex-end", marginBottom: 16 }}>
+        <div style={{ minWidth: 160 }}>
+          <label style={lab}>Sede</label>
+          <select style={inp} value={filtroSede} onChange={(e) => setFiltroSede(e.target.value)}>
+            <option value="">Todas</option>
+            {sedes.map((sd) => <option key={sd} value={sd}>{sd}</option>)}
+          </select>
+        </div>
+        <div style={{ flex: 1, minWidth: 200 }}>
+          <label style={lab}>Buscar</label>
+          <input style={inp} value={busqueda} onChange={(e) => setBusqueda(e.target.value)} placeholder="Nombre, DNI o email..." />
+        </div>
+      </div>
+
+      {puedeEliminar && (
+        <div style={{ display: "flex", gap: 10, marginBottom: 14, flexWrap: "wrap", alignItems: "center" }}>
+          <input style={{ ...inp, maxWidth: 220 }} placeholder="Nueva sede para seleccionados" value={nuevaSede} onChange={(e) => setNuevaSede(e.target.value)} />
+          <button style={btnOut} onClick={reasignarSeleccionados} disabled={procesando}><IconoPin /> {procesando ? "Procesando..." : "Reasignar sede"}</button>
+          <button style={{ ...btnOut, color: T.red, borderColor: T.red }} onClick={eliminarSeleccionados} disabled={procesando}><IconoBasura /> {procesando ? "Procesando..." : "Eliminar seleccionados"}</button>
+          <span style={{ fontSize: 11.5, color: T.inkSoft }}>{seleccionados.size > 0 ? `${seleccionados.size} seleccionado(s)` : `${filtrados.length} caso(s) en la lista`}</span>
+        </div>
+      )}
+
+      <div style={{ background: T.surface, border: "1px solid " + T.line, borderRadius: 16, overflowX: "auto" }}>
+        <table style={{ width: "100%", fontSize: 12, borderCollapse: "collapse" }}>
+          <thead>
+            <tr>
+              {puedeEliminar && <th style={th}><input type="checkbox" checked={seleccionados.size > 0 && seleccionados.size === filtrados.length} onChange={toggleTodos} /></th>}
+              <th style={th}>Nombre</th>
+              <th style={th}>DNI</th>
+              <th style={th}>Email</th>
+              <th style={th}>Teléfono</th>
+              <th style={th}>Sede</th>
+              <th style={th}>Vino a probar</th>
+              <th style={th}>Se inscribió</th>
+              <th style={th}>Cargado por</th>
+              <th style={th}>Estado</th>
+              {puedeEliminar && <th style={th}></th>}
+            </tr>
+          </thead>
+          <tbody>
+            {filtrados.length === 0 && (
+              <tr><td colSpan={11} style={{ padding: 40, textAlign: "center", color: T.inkSoft }}>No hay casos que coincidan.</td></tr>
+            )}
+            {filtrados.map((c) => (
+              <tr key={c.id}>
+                {puedeEliminar && <td style={td}><input type="checkbox" checked={seleccionados.has(c.id)} onChange={() => toggle(c.id)} /></td>}
+                <td style={td}><input style={{ ...inp, ...campoEditable }} value={valorCampo(c, "nombre")}
+                  onChange={(e) => onCambiaCampo(c.id, "nombre", e.target.value)} onBlur={() => guardarCampo(c, "nombre")} /></td>
+                <td style={td}><input style={{ ...inp, ...campoEditable, minWidth: 80 }} value={valorCampo(c, "dni")}
+                  onChange={(e) => onCambiaCampo(c.id, "dni", e.target.value)} onBlur={() => guardarCampo(c, "dni")} /></td>
+                <td style={td}><input style={{ ...inp, ...campoEditable }} value={valorCampo(c, "email")}
+                  onChange={(e) => onCambiaCampo(c.id, "email", e.target.value)} onBlur={() => guardarCampo(c, "email")} /></td>
+                <td style={td}><input style={{ ...inp, ...campoEditable }} value={valorCampo(c, "telefono")}
+                  onChange={(e) => onCambiaCampo(c.id, "telefono", e.target.value)} onBlur={() => guardarCampo(c, "telefono")} /></td>
+                <td style={td}><input style={{ ...inp, ...campoEditable }} value={valorCampo(c, "sede")}
+                  onChange={(e) => onCambiaCampo(c.id, "sede", e.target.value)} onBlur={() => guardarCampo(c, "sede")} /></td>
+                <td style={{ ...td, color: T.inkSoft }}>{c.vino_a_probar || "—"}</td>
+                <td style={{ ...td, color: T.inkSoft }}>{c.se_inscribio || "—"}</td>
                 <td style={{ ...td, color: T.inkSoft }}>{c.subido_por || "—"}{c.cargo_subido_por ? " · " + c.cargo_subido_por : ""}</td>
                 <td style={{ ...td, color: T.inkSoft }}><Badge tone={c.estado === "Cerrado" ? "green" : "gris"}>{c.estado}</Badge></td>
                 {puedeEliminar && <td style={td}><button onClick={() => eliminarUno(c.id)} style={delBtn}><IconoBasura /></button></td>}
@@ -456,6 +583,7 @@ function SegmentoPreguntas({ perfil }) {
             <option value="">Todos</option>
             <option value="sleepers">Sleepers</option>
             <option value="contratos">Contratos a Vencer</option>
+            <option value="gift">Gift</option>
           </select>
         </div>
         <button style={btnVerde} onClick={empezarNueva}><IconoMas /> Agregar pregunta</button>
@@ -471,6 +599,7 @@ function SegmentoPreguntas({ perfil }) {
               <select style={inp} value={form.tema} onChange={(e) => setForm({ ...form, tema: e.target.value })}>
                 <option value="sleepers">Sleepers</option>
                 <option value="contratos">Contratos a Vencer</option>
+                <option value="gift">Gift</option>
               </select>
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 18 }}>
@@ -510,7 +639,7 @@ function SegmentoPreguntas({ perfil }) {
           <div key={p.id} style={{ background: T.surface, border: "1px solid " + T.line, borderRadius: 16, padding: 16, opacity: p.activa ? 1 : 0.55 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10, marginBottom: 6 }}>
               <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                <Badge tone={p.tema === "sleepers" ? "blue" : "marca"}>{p.tema === "sleepers" ? "Sleepers" : "Contratos a Vencer"}</Badge>
+                <Badge tone={p.tema === "sleepers" ? "blue" : p.tema === "gift" ? "amber" : "marca"}>{p.tema === "sleepers" ? "Sleepers" : p.tema === "gift" ? "Gift" : "Contratos a Vencer"}</Badge>
                 {!p.activa && <Badge tone="gris">Inactiva</Badge>}
               </div>
               <div style={{ display: "flex", gap: 6 }}>
@@ -596,6 +725,7 @@ function SegmentoMensajes({ perfil }) {
             <option value="">Todos</option>
             <option value="sleepers">Sleepers</option>
             <option value="contratos">Contratos a Vencer</option>
+            <option value="gift">Gift</option>
           </select>
         </div>
         <button style={btnVerde} onClick={abrirNueva}><IconoMas /> Agregar mensaje</button>
@@ -613,7 +743,7 @@ function SegmentoMensajes({ perfil }) {
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10, marginBottom: 8 }}>
               <div>
                 <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 4 }}>
-                  <Badge tone={p.tema === "sleepers" ? "blue" : "marca"}>{p.tema === "sleepers" ? "Sleepers" : "Contratos a Vencer"}</Badge>
+                  <Badge tone={p.tema === "sleepers" ? "blue" : p.tema === "gift" ? "amber" : "marca"}>{p.tema === "sleepers" ? "Sleepers" : p.tema === "gift" ? "Gift" : "Contratos a Vencer"}</Badge>
                   {!p.activa && <Badge tone="gris">Inactiva</Badge>}
                 </div>
                 <p style={{ fontWeight: 700, fontSize: 13 }}>{p.etiqueta}</p>
@@ -646,6 +776,7 @@ function SegmentoMensajes({ perfil }) {
                 <select style={inp} value={editando.tema} onChange={(e) => setEditando({ ...editando, tema: e.target.value })}>
                   <option value="sleepers">Sleepers</option>
                   <option value="contratos">Contratos a Vencer</option>
+                  <option value="gift">Gift</option>
                 </select>
               </div>
               <div style={{ flex: 1 }}>

@@ -60,13 +60,14 @@ export async function obtenerPlantillasActivas() {
   return mapa;
 }
 
-export function completarPlaceholders(texto, { nombre, gerente, cargo, sede }) {
+export function completarPlaceholders(texto, { nombre, gerente, cargo, sede, diaHora }) {
   const first = (nombre || "").trim().split(" ")[0] || nombre || "Hola";
   return (texto || "")
     .replaceAll("{nombre}", first)
     .replaceAll("{gerente}", gerente || "el equipo")
     .replaceAll("{cargo}", cargo || "Gerente")
-    .replaceAll("{sede}", sede || "tu sede");
+    .replaceAll("{sede}", sede || "tu sede")
+    .replaceAll("{dia_hora}", diaHora || "el día y horario que coordinamos");
 }
 
 function construirMensajeFallback(nombre, gerente, sede, cargoLabel) {
@@ -107,6 +108,19 @@ export function construirMensajeSleeper(nombre, gerente, sede, cargoLabel, plant
   const claveDb = plantillas && plantillas[`sleepers|${clave}`];
   if (!claveDb) return clave === "general" ? construirMensajeFallback(nombre, gerente, sede, cargoLabel) : "";
   const cuerpo = completarPlaceholders(claveDb, { nombre, gerente: g, cargo: cargoLabel, sede: s });
+  return `${cuerpo}
+
+${g}
+${cargoLabel || "Gerente"} | Megatlon ${s}`;
+}
+
+// clave: "inicial" | "confirmacion" | "reenvio" | "comercial"
+export function construirMensajeGift(nombre, gerente, sede, cargoLabel, plantillas, clave, diaHora) {
+  const g = gerente || "el equipo";
+  const s = sede || "tu sede";
+  const claveDb = plantillas && plantillas[`gift|${clave}`];
+  if (!claveDb) return "";
+  const cuerpo = completarPlaceholders(claveDb, { nombre, gerente: g, cargo: cargoLabel, sede: s, diaHora });
   return `${cuerpo}
 
 ${g}
