@@ -57,9 +57,22 @@ function mapRow(row, defaults) {
 }
 
 function waLink(telefono, msg) { return "https://wa.me/" + telefono + "?text=" + encodeURIComponent(msg); }
+function quitarFirma(msg) {
+  // La firma que agrega el sistema siempre son las ultimas 2 lineas del
+  // mensaje: "Nombre" y "Cargo | Megatlon Sede". La detectamos por esa
+  // forma en vez de buscar palabras sueltas (que no siempre estan).
+  const bloques = (msg || "").split("\n\n");
+  if (bloques.length > 1) {
+    const ultimo = bloques[bloques.length - 1];
+    const lineas = ultimo.split("\n");
+    if (lineas.length === 2 && lineas[1].includes(" | Megatlon ")) {
+      return bloques.slice(0, -1).join("\n\n").trim();
+    }
+  }
+  return msg;
+}
 function mailLink(email, nombre, msg) {
-  const idxCierre = Math.max(msg.lastIndexOf("Saludos"), msg.lastIndexOf("Aguardo tu respuesta"));
-  const cuerpo = idxCierre > -1 ? msg.slice(0, idxCierre).trim() : msg;
+  const cuerpo = quitarFirma(msg);
   return `mailto:${email}?subject=${encodeURIComponent("Megatlon — tu mes sin cargo")}&body=${encodeURIComponent(cuerpo)}`;
 }
 
@@ -107,9 +120,8 @@ export default function Gift({ perfil, cargoFirma }) {
   const [filtroVinoAProbar, setFiltroVinoAProbar] = useState("");
   const [filtroActDesde, setFiltroActDesde] = useState("");
   const [filtroActHasta, setFiltroActHasta] = useState("");
-  const [filtroEnvio1, setFiltroEnvio1] = useState(false);
   const [filtroRespuesta1, setFiltroRespuesta1] = useState(false);
-  const [filtroEnvio2, setFiltroEnvio2] = useState(false);
+  const [filtroMensajeEnviado, setFiltroMensajeEnviado] = useState(null);
   const [filtroSeInscribioBucket, setFiltroSeInscribioBucket] = useState(null);
   const [filtroVinoBucket, setFiltroVinoBucket] = useState(false);
 
@@ -132,9 +144,8 @@ export default function Gift({ perfil, cargoFirma }) {
     return true;
   }
   function pasaFiltrosBucket(c) {
-    if (filtroEnvio1 && !c.fecha_envio_1) return false;
     if (filtroRespuesta1 && !c.dia_hora_coordinado) return false;
-    if (filtroEnvio2 && !c.fecha_envio_2) return false;
+    if (filtroMensajeEnviado && !c[CLAVE_CAMPOS[filtroMensajeEnviado].fecha]) return false;
     if (filtroSeInscribioBucket && c.se_inscribio !== filtroSeInscribioBucket) return false;
     if (filtroVinoBucket && c.vino_a_probar !== "Si") return false;
     return true;
@@ -144,9 +155,11 @@ export default function Gift({ perfil, cargoFirma }) {
     [giftCrudo, filtroSede, busqueda, filtroSeInscribio, filtroVinoAProbar, filtroActDesde, filtroActHasta]);
 
   const statsPies = useMemo(() => ({
-    envio1: baseParaTortas.filter((c) => c.fecha_envio_1).length,
     respuesta1: baseParaTortas.filter((c) => c.dia_hora_coordinado).length,
-    envio2: baseParaTortas.filter((c) => c.fecha_envio_2).length,
+    envioInicial: baseParaTortas.filter((c) => c.fecha_envio_1).length,
+    envioConfirmacion: baseParaTortas.filter((c) => c.fecha_envio_1_confirmacion).length,
+    envioReenvio: baseParaTortas.filter((c) => c.fecha_envio_1_reenvio).length,
+    envioComercial: baseParaTortas.filter((c) => c.fecha_envio_2).length,
     inscriptoSi: baseParaTortas.filter((c) => c.se_inscribio === "Si").length,
     inscriptoNo: baseParaTortas.filter((c) => c.se_inscribio === "No").length,
     vinoAProbar: baseParaTortas.filter((c) => c.vino_a_probar === "Si").length,
@@ -162,10 +175,11 @@ export default function Gift({ perfil, cargoFirma }) {
     if (!b.fecha_fin_cupon) return -1;
     return a.fecha_fin_cupon < b.fecha_fin_cupon ? -1 : a.fecha_fin_cupon > b.fecha_fin_cupon ? 1 : 0;
   }), [giftCrudo, filtroSede, filtroEstado, busqueda, filtroSeInscribio, filtroVinoAProbar, filtroActDesde, filtroActHasta,
-      filtroEnvio1, filtroRespuesta1, filtroEnvio2, filtroSeInscribioBucket, filtroVinoBucket]);
+      filtroRespuesta1, filtroMensajeEnviado, filtroSeInscribioBucket, filtroVinoBucket]);
 
   function togglePie(setter) { setter((v) => !v); }
   function toggleBucket(valor) { setFiltroSeInscribioBucket((prev) => (prev === valor ? null : valor)); }
+  function toggleMensajeEnviado(clave) { setFiltroMensajeEnviado((prev) => (prev === clave ? null : clave)); }
 
   function numMensajeDe(c) { return numMensajePorCaso[c.id] ?? claveDefault(c); }
   function elegirNumMensaje(c, clave) { setNumMensajePorCaso((prev) => ({ ...prev, [c.id]: clave })); }
@@ -338,12 +352,31 @@ export default function Gift({ perfil, cargoFirma }) {
         <button style={btnOut} onClick={exportarExcel}><IconoFlechaAbajo /> Exportar datos filtrados (Excel)</button>
       </div>
 
-      <p style={{ fontSize: 11.5, textTransform: "uppercase", letterSpacing: ".04em", color: T.inkSoft, marginBottom: 8 }}>Tocá para filtrar</p>
+      <p style={{ fontSize: 11.5, textTransform: "uppercase", letterSpacing: ".04em", color: T.inkSoft, marginBottom: 8 }}>Mensaje enviado — tocá para filtrar</p>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(130px,1fr))", gap: 10, marginBottom: 18 }}>
+        {[
+          { key: "inicial", label: "1. Inicial", n: statsPies.envioInicial, color: T.marca },
+          { key: "confirmacion", label: "2. Confirmación", n: statsPies.envioConfirmacion, color: T.blue },
+          { key: "reenvio", label: "3. Reenvío", n: statsPies.envioReenvio, color: T.amber },
+          { key: "comercial", label: "4. Comercial", n: statsPies.envioComercial, color: T.green },
+        ].map(({ key, label, n, color }) => {
+          const pct = statsPies.total ? Math.round((n / statsPies.total) * 100) : 0;
+          const activo = filtroMensajeEnviado === key;
+          return (
+            <button key={key} onClick={() => toggleMensajeEnviado(key)}
+              style={{ textAlign: "center", background: activo ? T.surface2 : T.surface, border: "1px solid " + (activo ? T.marca : T.line), borderRadius: 12, padding: "12px 8px", cursor: "pointer", fontFamily: FUENTE }}>
+              <div style={{ width: 52, height: 52, borderRadius: "50%", margin: "0 auto 8px", background: `conic-gradient(${color} 0% ${pct}%, ${T.surface2} ${pct}% 100%)` }} />
+              <div style={{ fontSize: 18, fontWeight: 800 }}>{n}</div>
+              <div style={{ fontSize: 10.5, color: T.inkSoft }}>{label}</div>
+            </button>
+          );
+        })}
+      </div>
+
+      <p style={{ fontSize: 11.5, textTransform: "uppercase", letterSpacing: ".04em", color: T.inkSoft, marginBottom: 8 }}>Resultado — tocá para filtrar</p>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(130px,1fr))", gap: 10, marginBottom: 22 }}>
         {[
-          { key: "envio1", label: "Envío mensaje 1", n: statsPies.envio1, color: T.marca, activo: filtroEnvio1, onClick: () => togglePie(setFiltroEnvio1) },
-          { key: "resp1", label: "Respuesta mensaje 1 (coordinó)", n: statsPies.respuesta1, color: T.blue, activo: filtroRespuesta1, onClick: () => togglePie(setFiltroRespuesta1) },
-          { key: "envio2", label: "Envío mensaje 2", n: statsPies.envio2, color: T.marca, activo: filtroEnvio2, onClick: () => togglePie(setFiltroEnvio2) },
+          { key: "resp1", label: "Coordinó visita", n: statsPies.respuesta1, color: T.blue, activo: filtroRespuesta1, onClick: () => togglePie(setFiltroRespuesta1) },
           { key: "vino", label: "Vino a probar", n: statsPies.vinoAProbar, color: T.amber, activo: filtroVinoBucket, onClick: () => togglePie(setFiltroVinoBucket) },
           { key: "si", label: "Se inscribió", n: statsPies.inscriptoSi, color: T.green, activo: filtroSeInscribioBucket === "Si", onClick: () => toggleBucket("Si") },
           { key: "no", label: "No se inscribió", n: statsPies.inscriptoNo, color: T.red, activo: filtroSeInscribioBucket === "No", onClick: () => toggleBucket("No") },

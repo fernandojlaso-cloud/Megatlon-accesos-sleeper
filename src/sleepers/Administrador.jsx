@@ -73,6 +73,8 @@ function SegmentoSleepers({ puedeEliminar, perfil }) {
   const [ediciones, setEdiciones] = useState({});
   const [procesando, setProcesando] = useState(false);
   const [progreso, setProgreso] = useState(null);
+  const [filtroCargaDesde, setFiltroCargaDesde] = useState("");
+  const [filtroCargaHasta, setFiltroCargaHasta] = useState("");
 
   async function reaplicarPlantillas() {
     const abiertos = filtrados.filter((c) => c.estado === "Abierto");
@@ -102,8 +104,10 @@ function SegmentoSleepers({ puedeEliminar, perfil }) {
     if (filtroSede && c.sede !== filtroSede) return false;
     const b = norm(busqueda);
     if (b && !(norm(c.nombre).includes(b) || norm(c.dni).includes(b) || norm(c.email).includes(b))) return false;
+    if (filtroCargaDesde && (!c.fecha_carga || c.fecha_carga < filtroCargaDesde)) return false;
+    if (filtroCargaHasta && (!c.fecha_carga || c.fecha_carga > filtroCargaHasta)) return false;
     return true;
-  }), [casos, filtroSede, busqueda]);
+  }), [casos, filtroSede, busqueda, filtroCargaDesde, filtroCargaHasta]);
 
   function toggle(id) { setSeleccionados((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; }); }
   function toggleTodos() { setSeleccionados((prev) => prev.size === filtrados.length ? new Set() : new Set(filtrados.map((c) => c.id))); }
@@ -145,6 +149,14 @@ function SegmentoSleepers({ puedeEliminar, perfil }) {
             <option value="">Todas</option>
             {sedes.map((sd) => <option key={sd} value={sd}>{sd}</option>)}
           </select>
+        </div>
+        <div style={{ minWidth: 150 }}>
+          <label style={lab}>Carga desde</label>
+          <input type="date" style={inp} value={filtroCargaDesde} onChange={(e) => setFiltroCargaDesde(e.target.value)} />
+        </div>
+        <div style={{ minWidth: 150 }}>
+          <label style={lab}>Carga hasta</label>
+          <input type="date" style={inp} value={filtroCargaHasta} onChange={(e) => setFiltroCargaHasta(e.target.value)} />
         </div>
         <div style={{ flex: 1, minWidth: 200 }}>
           <label style={lab}>Buscar</label>
