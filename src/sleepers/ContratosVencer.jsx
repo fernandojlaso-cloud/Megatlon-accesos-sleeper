@@ -764,12 +764,15 @@ function colorCelda(score) {
   return { bg: T.greenSoft, fg: T.green };
 }
 function MatrizNPS() {
-  const tdH = { padding: "8px 16px", color: T.inkSoft, fontWeight: 700, fontSize: 13 };
-  const tdC = { padding: "8px 16px", textAlign: "center", borderRadius: 8, fontWeight: 800, fontSize: 16 };
+  const tdH = { padding: "5px 10px", color: T.inkSoft, fontWeight: 700, fontSize: 11.5 };
+  const tdC = { padding: "5px 10px", textAlign: "center", borderRadius: 7, fontWeight: 800, fontSize: 14 };
   const NIVELES = [["Alta", "(+24 accesos)"], ["Media", "(10-23 accesos)"], ["Baja", "(1-9 accesos)"]];
   const SEGMENTOS = [["Detractor", "(0-6)"], ["Pasivo", "(7-8)"], ["Promotor", "(9-10)"]];
   return (
-    <div style={{ background: T.surface, border: "1px solid " + T.line, borderRadius: 14, padding: "16px 18px" }}>
+    <div style={{
+      width: "10cm", height: "6cm", boxSizing: "border-box", background: T.surface, border: "1px solid " + T.line,
+      borderRadius: 14, padding: "10px 14px", display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center",
+    }}>
       <table style={{ borderCollapse: "collapse" }}>
         <thead>
           <tr>
@@ -792,10 +795,10 @@ function MatrizNPS() {
           ))}
         </tbody>
       </table>
-      <div style={{ display: "flex", gap: 16, marginTop: 12, fontSize: 12, color: T.inkSoft, flexWrap: "wrap" }}>
-        <span><span style={{ display: "inline-block", width: 10, height: 10, borderRadius: 3, background: T.red, marginRight: 5 }} />Riesgo de baja (1-2)</span>
-        <span><span style={{ display: "inline-block", width: 10, height: 10, borderRadius: 3, background: T.amber, marginRight: 5 }} />En seguimiento (3-5)</span>
-        <span><span style={{ display: "inline-block", width: 10, height: 10, borderRadius: 3, background: T.green, marginRight: 5 }} />Fidelizado (6-10)</span>
+      <div style={{ display: "flex", gap: 12, marginTop: 8, fontSize: 10.5, color: T.inkSoft, flexWrap: "wrap", justifyContent: "center" }}>
+        <span><span style={{ display: "inline-block", width: 9, height: 9, borderRadius: 3, background: T.red, marginRight: 4 }} />Riesgo de baja (1-2)</span>
+        <span><span style={{ display: "inline-block", width: 9, height: 9, borderRadius: 3, background: T.amber, marginRight: 4 }} />En seguimiento (3-5)</span>
+        <span><span style={{ display: "inline-block", width: 9, height: 9, borderRadius: 3, background: T.green, marginRight: 4 }} />Fidelizado (6-10)</span>
       </div>
     </div>
   );
