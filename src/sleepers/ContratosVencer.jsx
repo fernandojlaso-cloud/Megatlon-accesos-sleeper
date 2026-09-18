@@ -315,9 +315,12 @@ export default function ContratosVencer({ perfil, cargoFirma }) {
           <p style={{ fontSize: 12, color: T.inkSoft, marginTop: 4 }}>Socios activos cuyo contrato vence entre 91 y 150 días desde hoy, cruzando Contratos + Accesos + NPS por DNI.</p>
           <p style={{ fontSize: 11.5, color: T.inkSoft, marginTop: 4 }}>La <b style={{ color: T.ink }}>asistencia</b> es de los últimos 2 meses. El <b style={{ color: T.ink }}>NPS</b> es histórico (la última respuesta que dio el socio, sin importar hace cuánto).</p>
         </div>
-        <div style={{ display: "flex", gap: 8 }}>
-          <button onClick={() => setManualAbierto((v) => !v)} style={btnOut}>{manualAbierto ? "Ocultar manual" : "Manual de uso"}</button>
-          <button onClick={() => setEvalAbierta((v) => !v)} style={btnOut}>{evalAbierta ? "Ocultar evaluación" : "Evaluación"}</button>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 10 }}>
+          <MatrizNPS />
+          <div style={{ display: "flex", gap: 8 }}>
+            <button onClick={() => setManualAbierto((v) => !v)} style={btnOut}>{manualAbierto ? "Ocultar manual" : "Manual de uso"}</button>
+            <button onClick={() => setEvalAbierta((v) => !v)} style={btnOut}>{evalAbierta ? "Ocultar evaluación" : "Evaluación"}</button>
+          </div>
         </div>
       </div>
 
@@ -748,3 +751,51 @@ const estilos = {
   smallBtn: { display: "inline-flex", alignItems: "center", background: "none", border: "1px solid " + T.line, color: T.ink, fontSize: 11, padding: "6px 10px", borderRadius: 11, cursor: "pointer", fontFamily: FUENTE },
   disabledBtn: { display: "inline-flex", alignItems: "center", gap: 6, background: T.surface2, color: T.inkSoft, fontSize: 11.5, fontWeight: 700, padding: "7px 11px", borderRadius: 11 },
 };
+
+// Matriz de asistencia x NPS, pintada segun el nivel de riesgo (score 1-10).
+const CELDA_MATRIZ = {
+  "Alta|Detractor": 5, "Alta|Pasivo": 8, "Alta|Promotor": 10,
+  "Media|Detractor": 3, "Media|Pasivo": 5, "Media|Promotor": 7,
+  "Baja|Detractor": 1, "Baja|Pasivo": 2, "Baja|Promotor": 4,
+};
+function colorCelda(score) {
+  if (score <= 2) return { bg: T.redSoft, fg: T.red };
+  if (score <= 5) return { bg: T.amberSoft, fg: T.amber };
+  return { bg: T.greenSoft, fg: T.green };
+}
+function MatrizNPS() {
+  const tdH = { padding: "3px 8px", color: T.inkSoft, fontWeight: 700, fontSize: 10.5 };
+  const tdC = { padding: "3px 8px", textAlign: "center", borderRadius: 6, fontWeight: 800, fontSize: 10.5 };
+  return (
+    <div style={{ background: T.surface, border: "1px solid " + T.line, borderRadius: 12, padding: "10px 12px" }}>
+      <table style={{ borderCollapse: "collapse" }}>
+        <thead>
+          <tr>
+            <td></td>
+            <td style={tdH}>Detractor</td>
+            <td style={tdH}>Pasivo</td>
+            <td style={tdH}>Promotor</td>
+          </tr>
+        </thead>
+        <tbody>
+          {["Alta", "Media", "Baja"].map((nivel) => (
+            <tr key={nivel}>
+              <td style={{ ...tdH, textAlign: "right" }}>{nivel}</td>
+              {["Detractor", "Pasivo", "Promotor"].map((seg) => {
+                const score = CELDA_MATRIZ[`${nivel}|${seg}`];
+                const c = colorCelda(score);
+                return <td key={seg} style={{ ...tdC, background: c.bg, color: c.fg }}>{score}</td>;
+              })}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <div style={{ display: "flex", gap: 8, marginTop: 6, fontSize: 9, color: T.inkSoft }}>
+        <span><span style={{ display: "inline-block", width: 8, height: 8, borderRadius: 2, background: T.red, marginRight: 3 }} />Riesgo de baja</span>
+        <span><span style={{ display: "inline-block", width: 8, height: 8, borderRadius: 2, background: T.amber, marginRight: 3 }} />En seguimiento</span>
+        <span><span style={{ display: "inline-block", width: 8, height: 8, borderRadius: 2, background: T.green, marginRight: 3 }} />Fidelizado</span>
+      </div>
+    </div>
+  );
+}
+
