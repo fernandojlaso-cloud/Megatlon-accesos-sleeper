@@ -764,24 +764,26 @@ function colorCelda(score) {
   return { bg: T.greenSoft, fg: T.green };
 }
 function MatrizNPS() {
-  const tdH = { padding: "3px 8px", color: T.inkSoft, fontWeight: 700, fontSize: 10.5 };
-  const tdC = { padding: "3px 8px", textAlign: "center", borderRadius: 6, fontWeight: 800, fontSize: 10.5 };
+  const tdH = { padding: "8px 16px", color: T.inkSoft, fontWeight: 700, fontSize: 13 };
+  const tdC = { padding: "8px 16px", textAlign: "center", borderRadius: 8, fontWeight: 800, fontSize: 16 };
+  const NIVELES = [["Alta", "(+24 accesos)"], ["Media", "(10-23 accesos)"], ["Baja", "(1-9 accesos)"]];
+  const SEGMENTOS = [["Detractor", "(0-6)"], ["Pasivo", "(7-8)"], ["Promotor", "(9-10)"]];
   return (
-    <div style={{ background: T.surface, border: "1px solid " + T.line, borderRadius: 12, padding: "10px 12px" }}>
+    <div style={{ background: T.surface, border: "1px solid " + T.line, borderRadius: 14, padding: "16px 18px" }}>
       <table style={{ borderCollapse: "collapse" }}>
         <thead>
           <tr>
             <td></td>
-            <td style={tdH}>Detractor</td>
-            <td style={tdH}>Pasivo</td>
-            <td style={tdH}>Promotor</td>
+            {SEGMENTOS.map(([seg, rango]) => (
+              <td key={seg} style={tdH}>{seg} <span style={{ fontWeight: 500, color: T.inkSoft }}>{rango}</span></td>
+            ))}
           </tr>
         </thead>
         <tbody>
-          {["Alta", "Media", "Baja"].map((nivel) => (
+          {NIVELES.map(([nivel, rango]) => (
             <tr key={nivel}>
-              <td style={{ ...tdH, textAlign: "right" }}>{nivel}</td>
-              {["Detractor", "Pasivo", "Promotor"].map((seg) => {
+              <td style={{ ...tdH, textAlign: "right", whiteSpace: "nowrap" }}>{nivel} <span style={{ fontWeight: 500 }}>{rango}</span></td>
+              {SEGMENTOS.map(([seg]) => {
                 const score = CELDA_MATRIZ[`${nivel}|${seg}`];
                 const c = colorCelda(score);
                 return <td key={seg} style={{ ...tdC, background: c.bg, color: c.fg }}>{score}</td>;
@@ -790,10 +792,10 @@ function MatrizNPS() {
           ))}
         </tbody>
       </table>
-      <div style={{ display: "flex", gap: 8, marginTop: 6, fontSize: 9, color: T.inkSoft }}>
-        <span><span style={{ display: "inline-block", width: 8, height: 8, borderRadius: 2, background: T.red, marginRight: 3 }} />Riesgo de baja</span>
-        <span><span style={{ display: "inline-block", width: 8, height: 8, borderRadius: 2, background: T.amber, marginRight: 3 }} />En seguimiento</span>
-        <span><span style={{ display: "inline-block", width: 8, height: 8, borderRadius: 2, background: T.green, marginRight: 3 }} />Fidelizado</span>
+      <div style={{ display: "flex", gap: 16, marginTop: 12, fontSize: 12, color: T.inkSoft, flexWrap: "wrap" }}>
+        <span><span style={{ display: "inline-block", width: 10, height: 10, borderRadius: 3, background: T.red, marginRight: 5 }} />Riesgo de baja (1-2)</span>
+        <span><span style={{ display: "inline-block", width: 10, height: 10, borderRadius: 3, background: T.amber, marginRight: 5 }} />En seguimiento (3-5)</span>
+        <span><span style={{ display: "inline-block", width: 10, height: 10, borderRadius: 3, background: T.green, marginRight: 5 }} />Fidelizado (6-10)</span>
       </div>
     </div>
   );
