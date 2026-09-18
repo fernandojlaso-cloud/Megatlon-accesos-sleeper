@@ -309,19 +309,30 @@ export default function ContratosVencer({ perfil, cargoFirma }) {
 
   return (
     <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 12, marginBottom: 18 }}>
-        <div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 20, marginBottom: 10 }}>
+        <div style={{ flex: "1 1 0", minWidth: 0 }}>
           <div style={{ fontSize: 13, textTransform: "uppercase", fontWeight: 800, letterSpacing: "-.01em", color: T.inkSoft }}>Seguimiento de contratos a vencer</div>
           <p style={{ fontSize: 12, color: T.inkSoft, marginTop: 4 }}>Socios activos cuyo contrato vence entre 91 y 150 días desde hoy, cruzando Contratos + Accesos + NPS por DNI.</p>
           <p style={{ fontSize: 11.5, color: T.inkSoft, marginTop: 4 }}>La <b style={{ color: T.ink }}>asistencia</b> es de los últimos 2 meses. El <b style={{ color: T.ink }}>NPS</b> es histórico (la última respuesta que dio el socio, sin importar hace cuánto).</p>
         </div>
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 10 }}>
-          <MatrizNPS />
-          <div style={{ display: "flex", gap: 8 }}>
-            <button onClick={() => setManualAbierto((v) => !v)} style={btnOut}>{manualAbierto ? "Ocultar manual" : "Manual de uso"}</button>
-            <button onClick={() => setEvalAbierta((v) => !v)} style={btnOut}>{evalAbierta ? "Ocultar evaluación" : "Evaluación"}</button>
-          </div>
+        <div style={{ flex: "1 1 0", minWidth: 0 }}>
+          <p style={{ fontSize: 11, color: T.ink, margin: "0 0 6px" }}>Y de ahí se agrupa en 3 niveles finales:</p>
+          <ul style={{ fontSize: 11, color: T.inkSoft, margin: "0 0 8px", paddingLeft: 16, lineHeight: 1.55 }}>
+            <li><b style={{ color: T.red }}>Riesgo de baja</b> = 1-2</li>
+            <li><b style={{ color: T.amber }}>En seguimiento</b> = 3-5</li>
+            <li><b style={{ color: T.green }}>Fidelizado</b> = 6-10</li>
+          </ul>
+          <p style={{ fontSize: 10, color: T.inkSoft, margin: 0, lineHeight: 1.5 }}>
+            Casos especiales: Alta+Detractor (posible boca en boca negativo) y Baja+Promotor (le gusta pero no lo usa). Sin NPS, se clasifica solo por asistencia: 1-9 / 10-28 / 29+.
+          </p>
         </div>
+        <div style={{ flexShrink: 0 }}>
+          <MatrizNPS />
+        </div>
+      </div>
+      <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginBottom: 18 }}>
+        <button onClick={() => setManualAbierto((v) => !v)} style={btnOut}>{manualAbierto ? "Ocultar manual" : "Manual de uso"}</button>
+        <button onClick={() => setEvalAbierta((v) => !v)} style={btnOut}>{evalAbierta ? "Ocultar evaluación" : "Evaluación"}</button>
       </div>
 
       {manualAbierto && (
@@ -764,15 +775,12 @@ function colorCelda(score) {
   return { bg: T.greenSoft, fg: T.green };
 }
 function MatrizNPS() {
-  const tdH = { padding: "5px 10px", color: T.inkSoft, fontWeight: 700, fontSize: 11.5 };
-  const tdC = { padding: "5px 10px", textAlign: "center", borderRadius: 7, fontWeight: 800, fontSize: 14 };
-  const NIVELES = [["Alta", "(+24 accesos)"], ["Media", "(10-23 accesos)"], ["Baja", "(1-9 accesos)"]];
+  const tdH = { padding: "3px 7px", color: T.inkSoft, fontWeight: 700, fontSize: 10 };
+  const tdC = { padding: "3px 7px", textAlign: "center", borderRadius: 6, fontWeight: 800, fontSize: 11.5 };
+  const NIVELES = [["Alta", "(+24)"], ["Media", "(10-23)"], ["Baja", "(1-9)"]];
   const SEGMENTOS = [["Detractor", "(0-6)"], ["Pasivo", "(7-8)"], ["Promotor", "(9-10)"]];
   return (
-    <div style={{
-      width: "10cm", height: "6cm", boxSizing: "border-box", background: T.surface, border: "1px solid " + T.line,
-      borderRadius: 14, padding: "10px 14px", display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center",
-    }}>
+    <div style={{ background: T.surface, border: "1px solid " + T.line, borderRadius: 12, padding: "8px 10px" }}>
       <table style={{ borderCollapse: "collapse" }}>
         <thead>
           <tr>
@@ -795,10 +803,10 @@ function MatrizNPS() {
           ))}
         </tbody>
       </table>
-      <div style={{ display: "flex", gap: 12, marginTop: 8, fontSize: 10.5, color: T.inkSoft, flexWrap: "wrap", justifyContent: "center" }}>
-        <span><span style={{ display: "inline-block", width: 9, height: 9, borderRadius: 3, background: T.red, marginRight: 4 }} />Riesgo de baja (1-2)</span>
-        <span><span style={{ display: "inline-block", width: 9, height: 9, borderRadius: 3, background: T.amber, marginRight: 4 }} />En seguimiento (3-5)</span>
-        <span><span style={{ display: "inline-block", width: 9, height: 9, borderRadius: 3, background: T.green, marginRight: 4 }} />Fidelizado (6-10)</span>
+      <div style={{ display: "flex", gap: 8, marginTop: 6, fontSize: 9, color: T.inkSoft, flexWrap: "wrap", justifyContent: "center" }}>
+        <span><span style={{ display: "inline-block", width: 8, height: 8, borderRadius: 2, background: T.red, marginRight: 3 }} />Riesgo de baja</span>
+        <span><span style={{ display: "inline-block", width: 8, height: 8, borderRadius: 2, background: T.amber, marginRight: 3 }} />En seguimiento</span>
+        <span><span style={{ display: "inline-block", width: 8, height: 8, borderRadius: 2, background: T.green, marginRight: 3 }} />Fidelizado</span>
       </div>
     </div>
   );
