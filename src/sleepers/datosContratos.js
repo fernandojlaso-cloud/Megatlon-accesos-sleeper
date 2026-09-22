@@ -145,7 +145,7 @@ export function parsearContratos(filas) {
     if (!dni) { sinDni++; continue; } // sin DNI no hay forma de identificar/cruzar al socio, se descarta
     const nombre = [buscarCol(row, "nombre"), buscarCol(row, "apellido")].filter(Boolean).join(" ").trim();
     const sedeOriginal = normalizarSede(buscarCol(row, "sucursal contrato", "sucursal"));
-    const fechaFin = fechaAISO(buscarCol(row, "fecha fin contrato", "fecha_fin_contrato"));
+    const fechaFin = fechaAISO(buscarCol(row, "fecha fin contrato", "fecha_fin_contrato", "fin de contrato"));
     if (!nombre || !fechaFin) continue;
     const sinSede = !sedeOriginal;
     out.push({
