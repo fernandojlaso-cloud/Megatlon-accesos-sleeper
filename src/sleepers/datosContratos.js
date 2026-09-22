@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import * as XLSX from "xlsx";
 import { supabase } from "../supabase.js";
 import { completarPlaceholders } from "./datosPlantillas.js";
 
@@ -115,6 +116,12 @@ const hoyYYYYMM = () => new Date().toISOString().slice(0, 7);
 function fechaAISO(valor) {
   if (!valor) return null;
   if (valor instanceof Date && !isNaN(valor)) return valor.toISOString().slice(0, 10);
+  // Excel a veces manda la fecha como numero de serie (ej: 46396) cuando la
+  // celda de origen no tiene formato de fecha aplicado, en vez de un objeto Date.
+  if (typeof valor === "number" && valor > 0 && valor < 100000) {
+    const info = XLSX.SSF.parse_date_code(valor);
+    if (info && info.y) return `${info.y}-${String(info.m).padStart(2, "0")}-${String(info.d).padStart(2, "0")}`;
+  }
   const str = valor.toString().trim();
   if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
   const m = str.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})$/);
