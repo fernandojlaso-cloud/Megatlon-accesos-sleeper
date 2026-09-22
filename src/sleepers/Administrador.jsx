@@ -726,8 +726,8 @@ function SegmentoMensajes({ perfil }) {
         clasificación. Podés editarlos en bloque acá — el cambio se aplica al toque a los mensajes nuevos que se
         generen. Placeholders disponibles: <code style={{ color: T.ink }}>{"{nombre}"}</code>, <code style={{ color: T.ink }}>{"{gerente}"}</code>,{" "}
         <code style={{ color: T.ink }}>{"{cargo}"}</code>, <code style={{ color: T.ink }}>{"{sede}"}</code>. La firma final se agrega sola después, no hace falta escribirla.
-        Para que el email siga saliendo sin firma final, terminá el mensaje de Sleepers con "Te agradezco mucho el tiempo
-        para responder este mensaje." y los de Contratos a Vencer con "¡Gracias!".
+        En Sleepers, el email sale sin la firma final automáticamente (no hace falta terminar el mensaje de ninguna forma en particular).
+        En Contratos a Vencer, para que el email siga saliendo sin firma final, terminá el mensaje con "¡Gracias!".
       </p>
 
       <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "flex-end", marginBottom: 16 }}>

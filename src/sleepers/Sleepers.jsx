@@ -38,14 +38,18 @@ function bucketVencimiento(c) {
 function waLink(telefono, msg) { return "https://wa.me/" + telefono + "?text=" + encodeURIComponent(msg); }
 
 // El email ya lleva firma propia del cliente de correo (Gmail/Outlook), asi que
-// para email sacamos el cierre "Nombre / Cargo | Megatlon Sede" y dejamos el
-// cuerpo hasta el agradecimiento. Los datos del gerente ya quedan mencionados
-// arriba, en "Soy fulano, gerente de Megatlon tal sede."
-const ANCLA_FIN_MENSAJE = "Te agradezco mucho el tiempo para responder este mensaje.";
+// para email sacamos el cierre "Nombre / Cargo | Megatlon Sede". Se detecta por
+// estructura (ultimo bloque separado por linea en blanco, de 2 lineas, terminando
+// en "| Megatlon ..."), no por una frase fija, porque el cuerpo del mensaje puede
+// venir de una plantilla editada en Administrador y no siempre termina igual.
 function mensajeSinFirma(mensajeCompleto) {
-  const idx = (mensajeCompleto || "").indexOf(ANCLA_FIN_MENSAJE);
-  if (idx === -1) return mensajeCompleto;
-  return mensajeCompleto.slice(0, idx + ANCLA_FIN_MENSAJE.length);
+  const texto = mensajeCompleto || "";
+  const bloques = texto.split("\n\n");
+  const ultimo = bloques[bloques.length - 1] || "";
+  if (bloques.length > 1 && ultimo.split("\n").length === 2 && ultimo.includes(" | Megatlon ")) {
+    return bloques.slice(0, -1).join("\n\n");
+  }
+  return texto;
 }
 
 function mailLink(email, nombre, msg) {
