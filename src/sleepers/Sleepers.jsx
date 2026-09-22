@@ -12,17 +12,8 @@ import { useMensajesPlantillas, construirMensajeSleeper } from "./datosPlantilla
 
 const MOTIVOS = ["Falta de tiempo", "Problemas personales", "Mudanza", "Lesión o problema de salud", "Problemas con el servicio", "Vacaciones", "Otro"];
 
-const RIESGO_POR_MOTIVO = {
-  "Falta de tiempo": "Alto",
-  "Problemas personales": "Alto",
-  "Mudanza": "Alto",
-  "Lesión o problema de salud": "Medio",
-  "Problemas con el servicio": "Medio",
-  "Vacaciones": "Bajo",
-  "Otro": "Bajo",
-};
-
 const hoyStr = () => new Date().toISOString().slice(0, 10);
+const sumarDias = (fechaIso, n) => { const d = new Date(fechaIso + "T00:00:00"); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); };
 const fmt = (iso) => { if (!iso) return "—"; const [y, m, d] = iso.split("-"); return `${d}/${m}/${y}`; };
 const norm = (s) => (s || "").toString().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
   .replace(/[[\]]/g, "").replace(/_/g, " ").trim();
@@ -449,12 +440,20 @@ export default function Sleepers({ perfil, cargoFirma }) {
     if (n === 1) {
       const campos = {};
       if (!c.mensaje) campos.mensaje = mensajeActivoDe(c);
-      if (!c.fecha_envio_mensaje) campos.fecha_envio_mensaje = hoyStr();
+      if (!c.fecha_envio_mensaje) {
+        campos.fecha_envio_mensaje = hoyStr();
+        campos.riesgo = "Bajo";
+        if (!c.fecha_seguimiento) campos.fecha_seguimiento = sumarDias(hoyStr(), 15);
+      }
       if (Object.keys(campos).length) await cambiarCampo(c.id, campos);
     } else {
       const campos = {};
       if (!c.mensaje_2) campos.mensaje_2 = mensajeActivoDe(c);
-      if (!c.fecha_envio_mensaje_2) campos.fecha_envio_mensaje_2 = hoyStr();
+      if (!c.fecha_envio_mensaje_2) {
+        campos.fecha_envio_mensaje_2 = hoyStr();
+        campos.riesgo = "Alto";
+        if (!c.fecha_seguimiento) campos.fecha_seguimiento = sumarDias(hoyStr(), 7);
+      }
       if (Object.keys(campos).length) await cambiarCampo(c.id, campos);
     }
   }
@@ -505,7 +504,7 @@ export default function Sleepers({ perfil, cargoFirma }) {
     return m;
   }, [statsSet]);
   const riesgoCounts = useMemo(() => {
-    const r = { Alto: 0, Medio: 0, Bajo: 0 };
+    const r = { Alto: 0, Bajo: 0 };
     statsSet.forEach((c) => { if (c.riesgo && r[c.riesgo] !== undefined) r[c.riesgo]++; });
     return r;
   }, [statsSet]);
@@ -552,7 +551,7 @@ export default function Sleepers({ perfil, cargoFirma }) {
           <p style={{ color: T.ink, fontWeight: 700, margin: "14px 0 6px" }}>El semáforo de alarma</p>
           <p><b style={{ color: T.ink }}>Verde</b>: recién cargado, sin contacto todavía. <b style={{ color: T.ink }}>Amarillo</b>: día 1 a 5, o ya hubo alguna interacción (mensaje enviado, motivo, riesgo, comentario o seguimiento programado). <b style={{ color: T.ink }}>Rojo</b>: 6 días o más sin ningún contacto. <b style={{ color: T.ink }}>Verde con tilde</b>: caso Cerrado (recuperado).</p>
           <p style={{ color: T.ink, fontWeight: 700, margin: "14px 0 6px" }}>Motivo y riesgo automático</p>
-          <p>Al cargar el motivo por el que dejó de venir, el riesgo (Alto/Medio/Bajo) se calcula solo y queda bloqueado — no se puede tocar a mano mientras haya un motivo cargado.</p>
+          <p>El riesgo se calcula solo según el mensaje: al enviar el 1° mensaje pasa a <b style={{ color: T.green }}>Bajo</b> y agenda el seguimiento a 15 días; al enviar el 2° mensaje pasa a <b style={{ color: T.red }}>Alto</b> y agenda el seguimiento a 7 días (solo si no había una fecha cargada a mano). El motivo por el que dejó de venir queda como dato informativo, ya no determina el riesgo.</p>
           <p style={{ color: T.ink, fontWeight: 700, margin: "14px 0 6px" }}>Vencimiento de contrato</p>
           <p>Si el socio tiene cargada la fecha de fin de contrato y le quedan 90 días o menos (o ya venció), la fila se marca con un marco rojo — distinto del rojo del semáforo, que es por falta de respuesta.</p>
           <p style={{ color: T.ink, fontWeight: 700, margin: "14px 0 6px" }}>Contacto</p>
@@ -815,7 +814,7 @@ function PanelFiltrosYListado({
         <div style={{ minWidth: 140 }}>
           <label style={lab}>Riesgo</label>
           <select style={inp} value={filtroRiesgo} onChange={(e) => setFiltroRiesgo(e.target.value)}>
-            <option value="">Todos</option><option value="Alto">Alto</option><option value="Medio">Medio</option><option value="Bajo">Bajo</option>
+            <option value="">Todos</option><option value="Alto">Alto</option><option value="Bajo">Bajo</option>
           </select>
         </div>
         <div style={{ minWidth: 160 }}>
@@ -887,7 +886,7 @@ function PanelFiltrosYListado({
           <p style={s.sectionTitle}>Nivel de riesgo</p>
           {Object.keys(riesgoCounts).map((r) => (
             <BarRow key={r} label={r} val={riesgoCounts[r]} max={maxRiesgo}
-              color={r === "Alto" ? T.red : r === "Medio" ? T.amber : T.green} />
+              color={r === "Alto" ? T.red : T.green} />
           ))}
         </div>
       </div>
@@ -954,7 +953,7 @@ function PanelFiltrosYListado({
       <p style={s.sectionTitle}>Listado de socios</p>
       <div style={{ ...s.tableWrap, overflowX: "auto" }}>
         <table style={{ width: "100%", fontSize: 12, borderCollapse: "collapse" }}>
-          <thead><tr>{["Alarma", "Socio", "Contacto", "Mensaje", "Motivo", "Riesgo", "Fin contrato", "Intención de volver", "Fecha carga", "Próximo seguimiento", "Estado", "Comentarios"].map((h) => (
+          <thead><tr>{["Alarma", "Fecha carga", "Fin contrato", "Socio", "Contacto", "Mensaje", "Motivo", "Intención de volver", "Riesgo de continuar", "Próximo seguimiento", "Estado", "Comentarios"].map((h) => (
             <th key={h} style={s.th}>{h}</th>
           ))}</tr></thead>
           <tbody>
@@ -971,7 +970,7 @@ function PanelFiltrosYListado({
               const hasEmail = c.email && c.email.includes("@");
               const vencido = c.fecha_seguimiento && c.fecha_seguimiento <= hoyStr() && c.estado === "Abierto";
               const porVencerContrato = contratoPorVencer(c);
-              const riesgoColor = c.riesgo === "Alto" ? T.red : c.riesgo === "Medio" ? T.amber : c.riesgo === "Bajo" ? T.green : null;
+              const riesgoColor = c.riesgo === "Alto" ? T.red : c.riesgo === "Bajo" ? T.green : null;
               return (
                 <tr key={c.id} style={{
                   opacity: c.estado === "Cerrado" ? 0.55 : 1,
@@ -997,6 +996,8 @@ function PanelFiltrosYListado({
                       )}
                     </div>
                   </td>
+                  <td style={{ ...s.td, color: T.inkSoft }}>{fmt(c.fecha_carga)}</td>
+                  <td style={{ ...s.td, color: porVencerContrato ? T.red : T.inkSoft, fontWeight: porVencerContrato ? 700 : 400 }}>{fmt(c.fecha_fin_contrato)}</td>
                   <td style={s.td}>
                     {puedeEditarIdentidad ? (
                       <div style={{ display: "flex", flexWrap: "wrap", gap: 5, alignItems: "center", marginBottom: 4 }}>
@@ -1057,31 +1058,25 @@ function PanelFiltrosYListado({
                   <td style={s.td}><button style={s.smallBtn} onClick={() => onVerMensaje(c)}>Ver mensaje</button></td>
                   <td style={s.td}>
                     <select style={{ ...inp, padding: "6px 8px", fontSize: 12 }} value={c.motivo || ""}
-                      onChange={(e) => {
-                        const motivo = e.target.value;
-                        const riesgo = motivo ? (RIESGO_POR_MOTIVO[motivo] || "") : "";
-                        onCambiarCampo(c.id, { motivo, riesgo, fecha_motivo_riesgo: hoyStr() });
-                      }}>
+                      onChange={(e) => onCambiarCampo(c.id, { motivo: e.target.value || null, fecha_motivo_riesgo: hoyStr() })}>
                       <option value="">—</option>
                       {MOTIVOS.map((m) => <option key={m} value={m}>{m}</option>)}
                     </select>
                   </td>
-                  <td style={s.td}>
-                    <select style={{ ...inp, padding: "6px 8px", fontSize: 12, opacity: c.motivo ? 0.6 : 1, cursor: c.motivo ? "not-allowed" : "pointer" }}
-                      value={c.riesgo || ""} disabled={!!c.motivo}
-                      title={c.motivo ? "Se calcula solo según el motivo. Borrá el motivo para editarlo a mano." : ""}
-                      onChange={(e) => onCambiarCampo(c.id, { riesgo: e.target.value, fecha_motivo_riesgo: hoyStr() })}>
-                      <option value="">—</option><option value="Alto">Alto</option><option value="Medio">Medio</option><option value="Bajo">Bajo</option>
-                    </select>
-                  </td>
-                  <td style={{ ...s.td, color: porVencerContrato ? T.red : T.inkSoft, fontWeight: porVencerContrato ? 700 : 400 }}>{fmt(c.fecha_fin_contrato)}</td>
                   <td style={s.td}>
                     <select style={{ ...inp, padding: "6px 8px", fontSize: 12 }} value={c.intencion_volver || ""}
                       onChange={(e) => onCambiarCampo(c.id, { intencion_volver: e.target.value || null })}>
                       <option value="">Sin definir</option><option value="Si">Sí</option><option value="No">No</option>
                     </select>
                   </td>
-                  <td style={{ ...s.td, color: T.inkSoft }}>{fmt(c.fecha_carga)}</td>
+                  <td style={s.td}>
+                    <select style={{ ...inp, padding: "6px 8px", fontSize: 12 }}
+                      value={c.riesgo || ""}
+                      title="Se calcula solo según el mensaje enviado: Bajo con el 1° mensaje, Alto con el 2°. Se puede corregir a mano."
+                      onChange={(e) => onCambiarCampo(c.id, { riesgo: e.target.value || null, fecha_motivo_riesgo: hoyStr() })}>
+                      <option value="">—</option><option value="Alto">Alto</option><option value="Bajo">Bajo</option>
+                    </select>
+                  </td>
                   <td style={s.td}>
                     <input type="date" style={{ ...inp, padding: "6px 8px", fontSize: 12 }} value={c.fecha_seguimiento || ""}
                       onChange={(e) => {
