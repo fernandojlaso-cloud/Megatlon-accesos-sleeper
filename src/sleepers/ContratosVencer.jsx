@@ -56,7 +56,11 @@ function leerArchivo(file) {
       }).catch(reject);
     } else {
       file.arrayBuffer().then((buf) => {
-        const wb = XLSX.read(buf, { type: "array", cellDates: true });
+        // Sin cellDates: si una columna que no es fecha (ej. "Accesos") tiene
+        // por error un formato de celda de fecha heredado, SheetJS la convertiria
+        // a un objeto Date en vez de al numero real. Se lee todo como viene y
+        // fechaAISO() ya sabe interpretar tanto un Date como un numero de serie.
+        const wb = XLSX.read(buf, { type: "array" });
         const sheet = wb.Sheets[wb.SheetNames[0]];
         resolve(XLSX.utils.sheet_to_json(sheet, { defval: "" }));
       }).catch(reject);

@@ -176,8 +176,13 @@ export function parsearAccesos(filas) {
   for (const row of filas) {
     const dni = soloDigitos(buscarCol(row, "numero_doc", "numerodoc", "dni"));
     if (!dni) continue;
-    const accesos = buscarCol(row, "accesos");
+    let accesos = buscarCol(row, "accesos");
     if (accesos === null || accesos === undefined || accesos === "") continue;
+    // Por si la celda vino con formato de fecha por error (ver leerArchivo en
+    // ContratosVencer.jsx): se recupera el numero de serie de Excel original.
+    if (accesos instanceof Date && !isNaN(accesos)) {
+      accesos = Math.round((accesos.getTime() - Date.UTC(1899, 11, 30)) / 86400000);
+    }
     out.push({
       dni, asistencias_2m: parseInt(accesos, 10) || 0,
       telefono: soloDigitos(buscarCol(row, "telefono")) || null,
