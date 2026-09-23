@@ -320,7 +320,7 @@ export function clasificar(r) {
   if (!segmento && r.asistencias_2m !== null && r.asistencias_2m !== undefined) {
     const a = r.asistencias_2m;
     const score = a <= 9 ? 1 : a <= 28 ? 4 : 7;
-    return { segmento: null, nivel: null, score, completo: true, soloAsistencia: true };
+    return { segmento: null, nivel, score, completo: true, soloAsistencia: true };
   }
   return { segmento, nivel, score: null, completo: false };
 }
@@ -413,7 +413,11 @@ ${ANCLA_CIERRE}`,
 export function construirMensajeContrato(nombreCompleto, gerente, sede, cargoLabel, dias, nivel, segmento, plantillas) {
   const g = gerente || "el equipo";
   const s = sede || "tu sede";
-  const claveDb = nivel && segmento && plantillas ? plantillas[`contratos|${nivel}|${segmento}`] : null;
+  // Sin respuesta de NPS no hay segmento, pero el nivel de asistencia si se
+  // conoce siempre: se busca una plantilla "SinNPS" para ese nivel antes de
+  // caer al mensaje generico fijo.
+  const claveSegmento = segmento || (nivel ? "SinNPS" : null);
+  const claveDb = nivel && claveSegmento && plantillas ? plantillas[`contratos|${nivel}|${claveSegmento}`] : null;
   const cuerpo = claveDb
     ? completarPlaceholders(claveDb, { nombre: nombreCompleto, gerente: g, cargo: cargoLabel, sede: s })
     : ((nivel && segmento && cuerpoPorClasificacion(nivel, segmento, nombreCompleto)) || cuerpoGenerico(nombreCompleto));
